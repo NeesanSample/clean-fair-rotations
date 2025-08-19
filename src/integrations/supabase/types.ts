@@ -14,7 +14,98 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      cleaning_assignments: {
+        Row: {
+          assignment_date: string
+          created_at: string
+          id: string
+          member_id: string
+          roster_id: string
+        }
+        Insert: {
+          assignment_date: string
+          created_at?: string
+          id?: string
+          member_id: string
+          roster_id: string
+        }
+        Update: {
+          assignment_date?: string
+          created_at?: string
+          id?: string
+          member_id?: string
+          roster_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cleaning_assignments_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "roster_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cleaning_assignments_roster_id_fkey"
+            columns: ["roster_id"]
+            isOneToOne: false
+            referencedRelation: "rosters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      roster_members: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          roster_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          roster_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          roster_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "roster_members_roster_id_fkey"
+            columns: ["roster_id"]
+            isOneToOne: false
+            referencedRelation: "rosters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rosters: {
+        Row: {
+          created_at: string
+          end_date: string
+          id: string
+          name: string
+          start_date: string
+        }
+        Insert: {
+          created_at?: string
+          end_date: string
+          id?: string
+          name: string
+          start_date: string
+        }
+        Update: {
+          created_at?: string
+          end_date?: string
+          id?: string
+          name?: string
+          start_date?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
