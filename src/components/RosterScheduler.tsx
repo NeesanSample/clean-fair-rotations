@@ -1173,35 +1173,37 @@ export const RosterScheduler = () => {
                             <div className="space-y-3">
                               {assignment.assignments ? assignment.assignments.map((taskAssignment, memberIndex) => (
                                 <div key={memberIndex} className="space-y-2">
-                                  {/* First line: Member name and avatar */}
-                                  <div className="flex items-center gap-3 p-3 rounded-xl shadow-sm hover:shadow-md transition-all duration-300" style={{ backgroundColor: memberNameToColor[taskAssignment.memberName] || 'hsl(var(--primary))' }}>
-                                    <Avatar className="h-8 w-8 ring-2 ring-white/30" style={{ boxShadow: `0 0 0 2px ${memberNameToColor[taskAssignment.memberName]}33` }}>
-                                      <AvatarImage alt={taskAssignment.memberName} src={avatarUrlForName(taskAssignment.memberName)} />
-                                      <AvatarFallback className="text-sm font-bold" style={{ color: getTextColorForBg(memberNameToColor[taskAssignment.memberName]) }}>
-                                        {taskAssignment.memberName.slice(0,2).toUpperCase()}
-                                      </AvatarFallback>
-                                    </Avatar>
-                                    <span className="text-white font-semibold truncate">{taskAssignment.memberName}</span>
-                                  </div>
-                                  {/* Second line: Status information */}
-                                  <div className="flex items-center gap-2 px-3 py-2 bg-secondary/30 rounded-lg text-xs">
-                                    {taskAssignment.isCompleted ? (
-                                      <div className="flex items-center gap-2 text-success">
-                                        <CheckSquare className="h-3 w-3" />
-                                        <span className="font-medium">Task completed successfully</span>
-                                      </div>
-                                    ) : taskAssignment.swapStatus === 'pending' ? (
-                                      <div className="flex items-center gap-2 text-warning">
-                                        <ArrowRightLeft className="h-3 w-3" />
-                                        <span className="font-medium">Swap request awaiting response</span>
-                                      </div>
-                                    ) : (
-                                      <div className="flex items-center gap-2 text-muted-foreground">
-                                        <Square className="h-3 w-3" />
-                                        <span className="font-medium">Task is pending completion</span>
-                                      </div>
-                                    )}
-                                  </div>
+                                                                     {/* First line: Member name and avatar with completion status */}
+                                   <div className="flex items-center justify-between gap-3 p-3 rounded-xl shadow-sm hover:shadow-md transition-all duration-300" style={{ backgroundColor: memberNameToColor[taskAssignment.memberName] || 'hsl(var(--primary))' }}>
+                                     <div className="flex items-center gap-3">
+                                       <Avatar className="h-8 w-8 ring-2 ring-white/30" style={{ boxShadow: `0 0 0 2px ${memberNameToColor[taskAssignment.memberName]}33` }}>
+                                         <AvatarImage alt={taskAssignment.memberName} src={avatarUrlForName(taskAssignment.memberName)} />
+                                         <AvatarFallback className="text-sm font-bold" style={{ color: getTextColorForBg(memberNameToColor[taskAssignment.memberName]) }}>
+                                           {taskAssignment.memberName.slice(0,2).toUpperCase()}
+                                         </AvatarFallback>
+                                       </Avatar>
+                                       <span className="text-white font-semibold truncate">{taskAssignment.memberName}</span>
+                                     </div>
+                                     {taskAssignment.isCompleted && (
+                                       <CheckSquare className="h-5 w-5 text-white flex-shrink-0" />
+                                     )}
+                                   </div>
+                                   {/* Second line: Status information (only for non-completed tasks) */}
+                                   {!taskAssignment.isCompleted && (
+                                     <div className="flex items-center gap-2 px-3 py-2 bg-secondary/30 rounded-lg text-xs">
+                                       {taskAssignment.swapStatus === 'pending' ? (
+                                         <div className="flex items-center gap-2 text-warning">
+                                           <ArrowRightLeft className="h-3 w-3" />
+                                           <span className="font-medium">Swap request awaiting response</span>
+                                         </div>
+                                       ) : (
+                                         <div className="flex items-center gap-2 text-muted-foreground">
+                                           <Square className="h-3 w-3" />
+                                           <span className="font-medium">Task is pending completion</span>
+                                         </div>
+                                       )}
+                                     </div>
+                                   )}
                                 </div>
                               )) : assignment.members.map((memberName, memberIndex) => (
                                 <div key={memberIndex} className="space-y-2">
@@ -1310,18 +1312,16 @@ export const RosterScheduler = () => {
                                       </DropdownMenuContent>
                                     </DropdownMenu>
                                   </div>
-                                  {/* Second line: Available actions summary */}
-                                  <div className="flex items-center gap-2 px-3 py-2 bg-secondary/30 rounded-lg text-xs">
-                                    <span className="text-muted-foreground">Available actions:</span>
-                                    {!taskAssignment.isCompleted ? (
-                                      <span className="text-success font-medium">Complete Task</span>
-                                    ) : (
-                                      <span className="text-warning font-medium">Reopen Task</span>
-                                    )}
-                                    {!taskAssignment.isCompleted && taskAssignment.swapStatus !== 'pending' && (
-                                      <span className="text-primary font-medium">• Request Swap</span>
-                                    )}
-                                  </div>
+                                                                     {/* Second line: Available actions summary (only for non-completed tasks) */}
+                                   {!taskAssignment.isCompleted && (
+                                     <div className="flex items-center gap-2 px-3 py-2 bg-secondary/30 rounded-lg text-xs">
+                                       <span className="text-muted-foreground">Available actions:</span>
+                                       <span className="text-success font-medium">Complete Task</span>
+                                       {taskAssignment.swapStatus !== 'pending' && (
+                                         <span className="text-primary font-medium">• Request Swap</span>
+                                       )}
+                                     </div>
+                                   )}
                                 </div>
                               )) : assignment.members.map((memberName, memberIndex) => (
                                 <div key={memberIndex} className="space-y-2">
