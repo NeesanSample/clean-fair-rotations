@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Plus, Trash2, Users, Calendar as CalendarDays, Clock, CheckCircle } from "lucide-react";
+import { CalendarIcon, Plus, Trash2, Users, Calendar as CalendarDays, Clock, CheckCircle, AlertCircle, Sparkles } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -39,21 +39,21 @@ export const RosterScheduler = () => {
 
   // Color helpers
   const generateColorForIndex = (index: number): string => {
-    const goldenAngle = 137.508; // distributes hues nicely
-    const hue = (index * goldenAngle) % 360;
-    // Higher contrast palette: higher saturation, slightly darker lightness
-    return `hsl(${hue} 80% 40%)`;
+    const colors = [
+      'hsl(250 84% 54%)', // Primary
+      'hsl(25 95% 53%)',  // Accent
+      'hsl(142 76% 36%)', // Success
+      'hsl(280 84% 64%)', // Purple variant
+      'hsl(45 95% 58%)',  // Warning
+      'hsl(200 84% 54%)', // Blue
+      'hsl(320 84% 54%)', // Pink
+      'hsl(160 84% 44%)', // Teal
+    ];
+    return colors[index % colors.length];
   };
 
   const getTextColorForBg = (hslColor: string): string => {
-    try {
-      const inside = hslColor.substring(hslColor.indexOf("(") + 1, hslColor.indexOf(")"));
-      const parts = inside.split(/\s+/);
-      const lightness = parseFloat(parts[2]?.replace('%', '') || '45');
-      return lightness >= 55 ? '#111827' : 'white';
-    } catch {
-      return 'white';
-    }
+    return 'white'; // Always use white text for modern contrast
   };
 
   const avatarUrlForName = (name: string): string => {
@@ -71,14 +71,17 @@ export const RosterScheduler = () => {
       };
       setMembers([...members, newMember]);
       setNewMemberName("");
+      
+      toast({
+        title: "Member Added",
+        description: `${newMember.name} has been added to the team`,
+      });
     }
   };
 
   const calculateWeeksNeeded = () => {
     const m = members.length;
     if (m < 2) return 0;
-    // Minimal weeks so that (2 * weeks) is divisible by m
-    // => weeks = lcm(m, 2) / 2, which is m/2 if m is even, else m
     return m % 2 === 0 ? Math.floor(m / 2) : m;
   };
 
@@ -102,7 +105,6 @@ export const RosterScheduler = () => {
 
   const generateBalancedPreview = (weeks: number) => {
     if (members.length < 2 || weeks <= 0) return [] as string[][];
-    // If multiple weeks and fewer than 4 members, non-consecutive is not feasible across weeks.
     const effectiveWeeks = weeks > 1 && members.length < 4 ? 1 : weeks;
     const counts: { [id: string]: number } = {};
     const lastAssignedWeek: { [id: string]: number } = {};
@@ -131,24 +133,30 @@ export const RosterScheduler = () => {
     } else {
       setPreviewWeeks([]);
     }
-    // Clear final assignments when team changes
     setAssignments([]);
   }, [members]);
 
   const removeMember = (id: string) => {
+    const memberToRemove = members.find(m => m.id === id);
     setMembers(members.filter(member => member.id !== id));
+    
+    if (memberToRemove) {
+      toast({
+        title: "Member Removed",
+        description: `${memberToRemove.name} has been removed from the team`,
+        variant: "destructive"
+      });
+    }
   };
 
   const getSundays = (start: Date, end: Date): Date[] => {
     const sundays: Date[] = [];
     const current = new Date(start);
     
-    // Find the first Sunday
     while (current.getDay() !== 0) {
       current.setDate(current.getDate() + 1);
     }
     
-    // Collect all Sundays until end date
     while (current <= end) {
       sundays.push(new Date(current));
       current.setDate(current.getDate() + 7);
@@ -177,7 +185,6 @@ export const RosterScheduler = () => {
       return;
     }
 
-    // Validate feasibility for non-consecutive rule
     const totalWeeks = sundays.length;
     if (totalWeeks > 1 && members.length < 4) {
       toast({
@@ -188,7 +195,6 @@ export const RosterScheduler = () => {
       return;
     }
 
-    // Balanced (not necessarily perfectly equal) assignment respecting no-consecutive rule
     const counts: { [id: string]: number } = {};
     const lastAssigned: { [id: string]: number } = {};
     members.forEach(m => { counts[m.id] = 0; lastAssigned[m.id] = -2; });
@@ -225,8 +231,8 @@ export const RosterScheduler = () => {
     setAssignments(newAssignments);
     
     toast({
-      title: "Schedule Generated",
-      description: `Generated cleaning schedule for ${sundays.length} weeks`
+      title: "Schedule Generated! ✨",
+      description: `Generated cleaning schedule for ${sundays.length} weeks with fair distribution`,
     });
   };
 
@@ -247,7 +253,6 @@ export const RosterScheduler = () => {
 
     setIsLoading(true);
     try {
-      // Create roster
       const { data: roster, error: rosterError } = await supabase
         .from('rosters')
         .insert({
@@ -260,7 +265,6 @@ export const RosterScheduler = () => {
 
       if (rosterError) throw rosterError;
 
-      // Create members
       const memberInserts = members.map(member => ({
         roster_id: roster.id,
         name: member.name
@@ -273,13 +277,11 @@ export const RosterScheduler = () => {
 
       if (membersError) throw membersError;
 
-      // Create name to ID mapping
       const memberNameToId: { [key: string]: string } = {};
       savedMembers.forEach(member => {
         memberNameToId[member.name] = member.id;
       });
 
-      // Create assignments
       const assignmentInserts: any[] = [];
       assignments.forEach(assignment => {
         assignment.members.forEach(memberName => {
@@ -300,11 +302,10 @@ export const RosterScheduler = () => {
       if (assignmentsError) throw assignmentsError;
 
       toast({
-        title: "Roster Saved",
-        description: `Successfully saved "${rosterName}" with ${assignments.length} weeks of cleaning assignments`
+        title: "Roster Saved Successfully! 🎉",
+        description: `"${rosterName}" saved with ${assignments.length} weeks of assignments`
       });
 
-      // Reset form
       setRosterName("");
       setStartDate(undefined);
       setEndDate(undefined);
@@ -327,166 +328,177 @@ export const RosterScheduler = () => {
   const selectedWeeks = calculateSelectedWeeks();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
-      <div className="container mx-auto p-6 space-y-8">
-        <div className="text-center space-y-4">
-          <div className="inline-flex items-center justify-center p-3 rounded-full bg-primary/10 mb-4">
-            <Users className="h-8 w-8 text-primary" />
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Background decorative elements */}
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/3 via-transparent to-accent/3" />
+      <div className="absolute top-20 left-10 w-72 h-72 bg-gradient-primary opacity-10 rounded-full blur-3xl animate-bounce-subtle" />
+      <div className="absolute bottom-20 right-10 w-96 h-96 bg-gradient-accent opacity-10 rounded-full blur-3xl animate-bounce-subtle [animation-delay:1s]" />
+      
+      <div className="relative z-10 container mx-auto px-6 py-12 space-y-12">
+        {/* Header */}
+        <div className="text-center space-y-6 animate-fade-in">
+          <div className="inline-flex items-center justify-center p-4 glass rounded-3xl hover:shadow-glow transition-all duration-500">
+            <Users className="h-12 w-12 text-primary animate-bounce-subtle" />
           </div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
-            House Cleaning Roster
-          </h1>
-          <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            Create fair and balanced cleaning schedules for your household members
-          </p>
+          <div className="space-y-4">
+            <h1 className="text-6xl font-bold bg-gradient-primary bg-clip-text text-transparent leading-tight">
+              House Cleaning Roster
+            </h1>
+            <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
+              Create fair and balanced cleaning schedules for your household members with intelligent distribution
+            </p>
+          </div>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-2">
-          {/* Input Section */}
-          <Card className="shadow-lg border-0 bg-card/50 backdrop-blur">
-            <CardHeader className="pb-4">
-              <CardTitle className="flex items-center gap-2 text-xl">
-                <CalendarDays className="h-5 w-5 text-primary" />
-                Setup Roster
-              </CardTitle>
-              <CardDescription className="text-base">
-                Configure your cleaning schedule parameters
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Roster Name */}
-              <div className="space-y-2">
-                <Label htmlFor="roster-name" className="text-sm font-medium">Roster Name</Label>
-                <Input
-                  id="roster-name"
-                  placeholder="e.g., January Cleaning Schedule"
-                  value={rosterName}
-                  onChange={(e) => setRosterName(e.target.value)}
-                  className="h-11"
-                />
-              </div>
-
-              {/* Members first */}
-              <div className="space-y-3">
-                <Label className="text-sm font-medium">Team Members</Label>
-                <div className="flex gap-2">
+        <div className="grid gap-10 lg:grid-cols-2">
+          {/* Setup Section */}
+          <div className="space-y-8 animate-slide-up">
+            <Card className="card-modern hover:shadow-glow transition-all duration-500">
+              <CardHeader className="pb-6">
+                <CardTitle className="flex items-center gap-4 text-2xl">
+                  <div className="p-3 bg-gradient-primary rounded-2xl">
+                    <CalendarDays className="h-6 w-6 text-primary-foreground" />
+                  </div>
+                  Setup Roster
+                </CardTitle>
+                <CardDescription className="text-lg text-muted-foreground">
+                  Configure your cleaning schedule parameters
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-8">
+                {/* Roster Name */}
+                <div className="space-y-3">
+                  <Label htmlFor="roster-name" className="text-sm font-semibold">Roster Name</Label>
                   <Input
-                    placeholder="Enter member name"
-                    value={newMemberName}
-                    onChange={(e) => setNewMemberName(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && addMember()}
-                    className="h-11"
+                    id="roster-name"
+                    placeholder="e.g., January Cleaning Schedule"
+                    value={rosterName}
+                    onChange={(e) => setRosterName(e.target.value)}
+                    className="h-12 border-2 border-border/50 focus:border-primary focus:ring-primary/20 rounded-xl transition-all duration-300"
                   />
-                  <Button onClick={addMember} size="icon" className="h-11 w-11 shrink-0">
-                    <Plus className="h-4 w-4" />
-                  </Button>
                 </div>
-                
-                {members.length > 0 && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-3">
-                    {members.map((member) => (
-                      <div
-                        key={member.id}
-                        className="relative rounded-2xl p-4 bg-gradient-to-br from-white/60 to-white/20 dark:from-white/[0.06] dark:to-white/[0.03] backdrop-blur supports-[backdrop-filter]:bg-background/40 ring-1 ring-border shadow-sm hover:shadow-md transition-all duration-200"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="relative">
-                            <Avatar className="h-10 w-10 ring-2 ring-offset-2 ring-offset-background" style={{ boxShadow: `0 0 0 3px ${member.color}22` }}>
-                              <AvatarImage alt={member.name} src={`https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(member.name)}`} />
-                              <AvatarFallback>{member.name.slice(0,2).toUpperCase()}</AvatarFallback>
-                            </Avatar>
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm font-semibold truncate">{member.name}</span>
-                              <span className="inline-flex h-2.5 w-2.5 rounded-full ring-2 ring-offset-2 ring-offset-background" style={{ backgroundColor: member.color }} />
-                            </div>
-                            <div className="text-xs text-muted-foreground mt-0.5">Member</div>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => removeMember(member.id)}
-                          className="absolute top-3 right-3 inline-flex h-7 w-7 items-center justify-center rounded-full bg-destructive/10 text-destructive hover:bg-destructive/15 transition-colors"
-                          aria-label={`Remove ${member.name}`}
+
+                {/* Team Members */}
+                <div className="space-y-4">
+                  <Label className="text-sm font-semibold">Team Members</Label>
+                  <div className="flex gap-3">
+                    <Input
+                      placeholder="Enter member name"
+                      value={newMemberName}
+                      onChange={(e) => setNewMemberName(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && addMember()}
+                      className="h-12 border-2 border-border/50 focus:border-primary focus:ring-primary/20 rounded-xl transition-all duration-300"
+                    />
+                    <Button 
+                      onClick={addMember} 
+                      size="lg" 
+                      className="h-12 px-6 btn-gradient rounded-xl font-semibold transform active:scale-95"
+                      disabled={!newMemberName.trim()}
+                    >
+                      <Plus className="h-5 w-5" />
+                    </Button>
+                  </div>
+                  
+                  {members.length > 0 && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
+                      {members.map((member, index) => (
+                        <div
+                          key={member.id}
+                          className="group relative card-modern hover:scale-105 transition-all duration-300"
+                          style={{ animationDelay: `${index * 100}ms` }}
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                          <div className="flex items-center gap-4 p-5">
+                            <div className="relative">
+                              <Avatar className="h-12 w-12 ring-4 ring-offset-2 ring-offset-background border-2 border-background shadow-lg" style={{ borderColor: member.color }}>
+                                <AvatarImage src={avatarUrlForName(member.name)} />
+                                <AvatarFallback className="font-bold text-sm" style={{ backgroundColor: member.color, color: 'white' }}>
+                                  {member.name.slice(0,2).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full shadow-lg animate-pulse" style={{ backgroundColor: member.color }} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <span className="font-bold text-foreground block truncate">{member.name}</span>
+                              <span className="text-sm text-muted-foreground">Team Member</span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => removeMember(member.id)}
+                            className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 inline-flex h-8 w-8 items-center justify-center rounded-xl bg-destructive/10 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-all duration-300"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Quick Stats */}
+                {members.length >= 2 && (
+                  <div className="glass p-6 rounded-2xl border-2 border-border/20 animate-fade-in">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="p-2 bg-gradient-accent rounded-xl">
+                        <Sparkles className="h-5 w-5 text-accent-foreground" />
                       </div>
-                    ))}
+                      <span className="font-bold text-foreground">Team Analysis</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="text-center p-4 bg-secondary/50 rounded-xl">
+                        <div className="text-2xl font-bold text-primary">{members.length}</div>
+                        <div className="text-sm text-muted-foreground">Members</div>
+                      </div>
+                      <div className="text-center p-4 bg-secondary/50 rounded-xl">
+                        <div className="text-2xl font-bold text-accent">{weeksNeeded}</div>
+                        <div className="text-sm text-muted-foreground">Weeks Needed</div>
+                      </div>
+                    </div>
+                    {weeksNeeded > 0 && (
+                      <div className="mt-4 p-4 bg-success/10 border-2 border-success/20 rounded-xl">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-success" />
+                          <span className="text-success font-medium text-sm">
+                            Minimum {weeksNeeded} weeks recommended for fair distribution
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
+              </CardContent>
+            </Card>
+          </div>
 
-              {/* Suggested Schedule (Modern grid) */}
-              {members.length >= 2 && (
-                <Card className="bg-muted/30 border-muted">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base">Suggested Schedule</CardTitle>
-                    <CardDescription>
-                      {previewWeeks.length > 0
-                        ? `${previewWeeks.length} week(s) suggested based on ${members.length} members`
-                        : `Add more members to suggest at least 1 week`}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {previewWeeks.length > 0 ? (
-                      <div className="space-y-3">
-                        {previewWeeks.map((ids, idx) => (
-                          <div key={idx} className="rounded-xl border bg-background/60 group">
-                            <div className="flex items-center justify-between px-4 py-2 border-b">
-                              <div className="text-sm font-semibold tracking-wide text-muted-foreground">Week {idx + 1}</div>
-                              <div className="text-xs text-muted-foreground">2 members</div>
-                            </div>
-                            <div className="grid [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))] gap-3 p-4 auto-rows-min">
-                              {ids.map((id) => (
-                                <div
-                                  key={id}
-                                  className="flex items-center gap-3 rounded-lg p-2 ring-1 ring-border hover:shadow-md transition-all duration-200 w-full"
-                                  style={{ backgroundColor: memberIdToColor[id] }}
-                                >
-                                  <Avatar className="h-8 w-8 ring-2 ring-offset-2 ring-offset-background" style={{ boxShadow: `0 0 0 3px ${memberIdToColor[id]}33` }}>
-                                    <AvatarImage alt={memberIdToName[id]} src={avatarUrlForName(memberIdToName[id])} />
-                                    <AvatarFallback>{memberIdToName[id].slice(0,2).toUpperCase()}</AvatarFallback>
-                                  </Avatar>
-                                  <div className="min-w-0 flex-1">
-                                    <div className="flex items-center gap-2">
-                                      <span className="truncate text-sm font-semibold" style={{ color: getTextColorForBg(memberIdToColor[id]) }}>{memberIdToName[id]}</span>
-                                      <span className="inline-flex h-2.5 w-2.5 rounded-full ring-2 ring-offset-2 ring-offset-background" style={{ backgroundColor: getTextColorForBg(memberIdToColor[id]) === 'white' ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.75)' }} />
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-sm text-muted-foreground">Not enough members to suggest multiple weeks without consecutive assignments.</div>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Date Range */}
-              <div className="space-y-4">
-                <Label className="text-sm font-medium">Date Range</Label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground">Start Date</Label>
+          {/* Schedule Configuration */}
+          <div className="space-y-8 animate-slide-up [animation-delay:200ms]">
+            <Card className="card-modern hover:shadow-glow transition-all duration-500">
+              <CardHeader className="pb-6">
+                <CardTitle className="flex items-center gap-4 text-2xl">
+                  <div className="p-3 bg-gradient-secondary rounded-2xl">
+                    <Clock className="h-6 w-6 text-primary" />
+                  </div>
+                  Date Range
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-8">
+                {/* Date Range */}
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <Label className="text-sm font-semibold">Start Date</Label>
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button
                           variant="outline"
                           className={cn(
-                            "w-full justify-start text-left font-normal h-11",
+                            "h-12 border-2 border-border/50 hover:border-primary focus:border-primary rounded-xl transition-all duration-300 justify-start text-left font-normal",
                             !startDate && "text-muted-foreground"
                           )}
                         >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          <CalendarIcon className="mr-3 h-5 w-5" />
                           {startDate ? format(startDate, "PPP") : "Pick start date"}
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
+                      <PopoverContent className="w-auto p-0 glass border-2 border-border/30" align="start">
                         <Calendar
                           mode="single"
                           selected={startDate}
@@ -497,22 +509,22 @@ export const RosterScheduler = () => {
                     </Popover>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground">End Date</Label>
+                  <div className="space-y-3">
+                    <Label className="text-sm font-semibold">End Date</Label>
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button
                           variant="outline"
                           className={cn(
-                            "w-full justify-start text-left font-normal h-11",
+                            "h-12 border-2 border-border/50 hover:border-primary focus:border-primary rounded-xl transition-all duration-300 justify-start text-left font-normal",
                             !endDate && "text-muted-foreground"
                           )}
                         >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          <CalendarIcon className="mr-3 h-5 w-5" />
                           {endDate ? format(endDate, "PPP") : "Pick end date"}
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
+                      <PopoverContent className="w-auto p-0 glass border-2 border-border/30" align="start">
                         <Calendar
                           mode="single"
                           selected={endDate}
@@ -523,184 +535,129 @@ export const RosterScheduler = () => {
                     </Popover>
                   </div>
                 </div>
-              </div>
 
-              {/* Week Calculation Display */}
-              {(startDate && endDate) && (
-                <Card className="bg-accent/50 border-accent">
-                  <CardContent className="pt-4">
-                    <div className="flex items-center gap-3">
-                      <Clock className="h-5 w-5 text-accent-foreground" />
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium">
-                          Selected Period: {selectedWeeks} weeks
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Cleaning assignments will be scheduled for every Sunday
-                        </p>
+                {/* Date Analysis */}
+                {startDate && endDate && members.length >= 2 && (
+                  <div className="glass p-6 rounded-2xl border-2 border-border/20 animate-fade-in">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Selected weeks:</span>
+                        <span className="font-bold text-primary text-xl">{selectedWeeks}</span>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Members - duplicate input removed */}
-
-              {/* Info Panel */}
-              {members.length >= 2 && (
-                <Card className="bg-primary/5 border-primary/20">
-                  <CardContent className="pt-4">
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2 text-sm">
-                        <Users className="h-4 w-4 text-primary" />
-                        <span className="font-medium">
-                          {members.length} members added
-                        </span>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Minimum needed:</span>
+                        <span className="font-bold text-accent text-xl">{weeksNeeded}</span>
                       </div>
-                      <div className="flex items-center gap-2 text-sm">
-                        <CheckCircle className="h-4 w-4 text-green-600" />
-                        <span>
-                          Minimum {weeksNeeded} weeks needed for fair distribution
-                        </span>
-                      </div>
-                      {selectedWeeks > 0 && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <Clock className="h-4 w-4 text-blue-600" />
-                          <span>
-                            {selectedWeeks >= 1
-                              ? `You'll generate ${selectedWeeks} weekly assignments (2 members each).`
-                              : `Pick a date range to generate assignments.`}
-                          </span>
+                      
+                      {selectedWeeks < weeksNeeded && (
+                        <div className="p-4 bg-warning/10 border-2 border-warning/20 rounded-xl">
+                          <div className="flex items-center gap-3">
+                            <AlertCircle className="h-5 w-5 text-warning shrink-0" />
+                            <span className="text-warning font-medium">
+                              Consider selecting at least {weeksNeeded} weeks for optimal distribution
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {selectedWeeks >= weeksNeeded && (
+                        <div className="p-4 bg-success/10 border-2 border-success/20 rounded-xl">
+                          <div className="flex items-center gap-3">
+                            <CheckCircle className="h-5 w-5 text-success shrink-0" />
+                            <span className="text-success font-medium">
+                              Perfect! Your schedule allows for fair distribution
+                            </span>
+                          </div>
                         </div>
                       )}
                     </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Actions */}
-              <div className="space-y-3 pt-2">
-                <Button 
-                  onClick={generateSchedule} 
-                  className="w-full h-11 text-base"
-                  disabled={!startDate || !endDate || members.length < 2}
-                >
-                  Generate Schedule
-                </Button>
-                {assignments.length > 0 && (
-                  <Button 
-                    onClick={saveRoster} 
-                    variant="secondary" 
-                    className="w-full h-11 text-base"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? "Saving..." : "Save Roster"}
-                  </Button>
+                  </div>
                 )}
+
+                {/* Action Buttons */}
+                <div className="space-y-4">
+                  <Button 
+                    onClick={generateSchedule} 
+                    disabled={members.length < 2 || !startDate || !endDate}
+                    size="lg"
+                    className="w-full btn-gradient h-14 rounded-xl font-bold text-lg transform active:scale-95"
+                  >
+                    <Sparkles className="h-5 w-5 mr-3" />
+                    Generate Schedule
+                  </Button>
+
+                  {assignments.length > 0 && (
+                    <Button 
+                      onClick={saveRoster}
+                      disabled={isLoading || !rosterName.trim()}
+                      size="lg"
+                      variant="outline"
+                      className="w-full h-12 rounded-xl font-semibold border-2 border-primary/30 hover:bg-primary hover:text-primary-foreground"
+                    >
+                      {isLoading ? "Saving..." : "Save Roster"}
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {/* Generated Schedule */}
+        {assignments.length > 0 && (
+          <Card className="card-modern animate-fade-in mt-12">
+            <CardHeader className="pb-6">
+              <CardTitle className="flex items-center gap-4 text-2xl">
+                <div className="p-3 bg-gradient-primary rounded-2xl">
+                  <CheckCircle className="h-6 w-6 text-primary-foreground" />
+                </div>
+                Generated Schedule
+                <Badge className="ml-auto bg-gradient-accent text-accent-foreground font-bold px-4 py-2 rounded-xl">
+                  {assignments.length} weeks
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-hidden rounded-2xl border-2 border-border/30">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-gradient-secondary border-b-2 border-border/30 hover:bg-gradient-secondary">
+                      <TableHead className="font-bold text-foreground text-lg p-6">Date</TableHead>
+                      <TableHead className="font-bold text-foreground text-lg p-6">Assigned Members</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {assignments.map((assignment, index) => (
+                      <TableRow 
+                        key={index} 
+                        className="border-b border-border/20 hover:bg-secondary/30 transition-all duration-300"
+                        style={{ animationDelay: `${index * 100}ms` }}
+                      >
+                        <TableCell className="p-6 font-semibold text-lg">
+                          {format(new Date(assignment.date), "EEEE, MMMM do, yyyy")}
+                        </TableCell>
+                        <TableCell className="p-6">
+                          <div className="flex gap-3">
+                            {assignment.members.map((memberName, memberIndex) => (
+                              <div
+                                key={memberIndex}
+                                className="inline-flex items-center gap-3 px-6 py-3 rounded-2xl font-bold shadow-lg hover:shadow-glow transition-all duration-300"
+                                style={{ backgroundColor: memberNameToColor[memberName] || 'hsl(var(--primary))' }}
+                              >
+                                <div className="w-3 h-3 bg-white rounded-full animate-pulse" />
+                                <span className="text-white">{memberName}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
             </CardContent>
           </Card>
-
-          {/* Results Section */}
-          <Card className="shadow-lg border-0 bg-card/50 backdrop-blur">
-            <CardHeader className="pb-4">
-              <CardTitle className="flex items-center gap-2 text-xl">
-                <CalendarDays className="h-5 w-5 text-primary" />
-                Generated Schedule
-              </CardTitle>
-              <CardDescription className="text-base">
-                {assignments.length > 0 
-                  ? `${assignments.length} weeks of cleaning assignments`
-                  : "Schedule will appear here after generation"
-                }
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {assignments.length > 0 ? (
-                <div className="space-y-4 max-h-[600px] overflow-y-auto">
-                  {/* Summary counts */}
-                  <div className="p-3 rounded-md border bg-muted/30">
-                    <div className="text-sm font-medium mb-2">Assigned Counts</div>
-                    <div className="flex flex-wrap gap-2">
-                      {(() => {
-                        const counts: { [name: string]: number } = {};
-                        assignments.forEach(a => a.members.forEach(n => counts[n] = (counts[n] || 0) + 1));
-                        const entries = Object.entries(counts).sort((a, b) => a[0].localeCompare(b[0]));
-                        return entries.length > 0
-                          ? entries.map(([name, count]) => (
-                              <Badge key={name} variant="outline" className="text-sm">{name}: {count}</Badge>
-                            ))
-                          : (<span className="text-xs text-muted-foreground">No assignments yet</span>);
-                      })()}
-                    </div>
-                  </div>
-                  {/* Legend */}
-                  {members.length > 0 && (
-                    <div className="rounded-md border bg-background/60 p-3">
-                      <div className="text-sm font-medium mb-2">Legend</div>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-                        {members.map((m) => (
-                          <div
-                            key={m.id}
-                            className="relative overflow-hidden rounded-md ring-1 ring-border hover:shadow-sm transition-all duration-200"
-                            style={{ backgroundColor: m.color }}
-                            title={m.name}
-                          >
-                            <div
-                              className="flex items-center justify-center h-9 text-xs font-semibold"
-                              style={{ color: getTextColorForBg(m.color) }}
-                            >
-                              <span className="truncate px-2 w-full text-center">{m.name}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {/* Table view (modern, readable) */}
-                  <Table>
-                    <TableHeader className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Week</TableHead>
-                        <TableHead>Members</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {assignments.map((assignment, index) => (
-                        <TableRow key={index}>
-                          <TableCell className="whitespace-nowrap">{format(new Date(assignment.date), "EEE, MMM d, yyyy")}</TableCell>
-                          <TableCell>Week {index + 1}</TableCell>
-                          <TableCell>
-                            <div className="grid [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))] gap-2 auto-rows-min">
-                              {assignment.members.map((member, i) => (
-                                <div key={i} className="flex items-center gap-3 rounded-md p-2 ring-1 ring-border hover:shadow-sm transition-all duration-200 w-full" style={{ backgroundColor: memberNameToColor[member] }}>
-                                  <Avatar className="h-7 w-7 ring-2 ring-offset-2 ring-offset-background" style={{ boxShadow: `0 0 0 3px ${memberNameToColor[member]}33` }}>
-                                    <AvatarImage alt={member} src={avatarUrlForName(member)} />
-                                    <AvatarFallback>{member.slice(0,2).toUpperCase()}</AvatarFallback>
-                                  </Avatar>
-                                  <span className="truncate text-sm font-semibold block" style={{ color: getTextColorForBg(memberNameToColor[member]) }}>{member}</span>
-                                  <span className="inline-flex h-2 w-2 rounded-full ring-2 ring-offset-2 ring-offset-background" style={{ backgroundColor: getTextColorForBg(memberNameToColor[member]) === 'white' ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.75)' }} />
-                                </div>
-                              ))}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                    <TableCaption>{assignments.length} total week(s)</TableCaption>
-                  </Table>
-                </div>
-              ) : (
-                <div className="text-center text-muted-foreground py-12">
-                  <CalendarDays className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                  <p className="text-lg mb-2">No schedule generated yet</p>
-                  <p className="text-sm">Add members and select dates to generate assignments</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+        )}
       </div>
     </div>
   );
