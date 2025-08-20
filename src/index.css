@@ -80,6 +80,11 @@ All colors MUST be HSL. */
     --sidebar-border: 220 13% 91%;
 
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Mobile-specific optimizations */
+    --mobile-table-min-width: 800px;
+    --mobile-card-padding: 0.75rem;
+    --mobile-text-size: 0.875rem;
   }
 
   .dark {
@@ -215,5 +220,37 @@ All colors MUST be HSL. */
   @keyframes pulse-glow {
     0%, 100% { box-shadow: 0 0 20px hsl(var(--primary) / 0.3); }
     50% { box-shadow: 0 0 40px hsl(var(--primary) / 0.6); }
+  }
+
+  /* Mobile-specific optimizations */
+  .mobile-table-container {
+    @apply overflow-x-auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .mobile-table {
+    min-width: var(--mobile-table-min-width);
+  }
+
+  /* iPhone 14 Pro Max specific optimizations */
+  @media screen and (max-width: 430px) {
+    .mobile-table {
+      min-width: 100vw;
+    }
+    
+    .mobile-card {
+      @apply p-3;
+    }
+    
+    .mobile-text {
+      @apply text-sm;
+    }
+  }
+
+  /* Ensure proper touch targets on mobile */
+  @media (pointer: coarse) {
+    .mobile-touch-target {
+      @apply min-h-[44px] min-w-[44px];
+    }
   }
 }

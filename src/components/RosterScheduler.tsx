@@ -1123,7 +1123,7 @@ export const RosterScheduler = () => {
               {/* Assigned counts summary */}
               <div className="glass p-4 rounded-xl border-2 border-border/20 mb-6">
                 <div className="text-sm font-semibold text-muted-foreground mb-3">Counts</div>
-                <div className="grid [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))] gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                   {Object.keys(assignedCounts).length > 0 ? (
                     Object.entries(assignedCounts)
                       .sort((a, b) => a[0].localeCompare(b[0]))
@@ -1150,14 +1150,14 @@ export const RosterScheduler = () => {
                   )}
                         </div>
                       </div>
-              <div className="overflow-hidden rounded-2xl border-2 border-border/30">
-                <Table className="w-full">
+              <div className="mobile-table-container rounded-2xl border-2 border-border/30">
+                <Table className="w-full mobile-table">
                   <TableHeader>
                     <TableRow className="bg-gradient-secondary border-b-2 border-border/30 hover:bg-gradient-secondary">
-                      <TableHead className="font-bold text-foreground text-lg p-6">Date</TableHead>
-                      <TableHead className="font-bold text-foreground text-lg p-6">Members</TableHead>
-                      <TableHead className="font-bold text-foreground text-lg p-6">Status</TableHead>
-                      <TableHead className="font-bold text-foreground text-lg p-6">Actions</TableHead>
+                      <TableHead className="font-bold text-foreground text-base sm:text-lg p-3 sm:p-6">Date</TableHead>
+                      <TableHead className="font-bold text-foreground text-base sm:text-lg p-3 sm:p-6">Members</TableHead>
+                      <TableHead className="font-bold text-foreground text-base sm:text-lg p-3 sm:p-6">Status</TableHead>
+                      <TableHead className="font-bold text-foreground text-base sm:text-lg p-3 sm:p-6">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1167,87 +1167,87 @@ export const RosterScheduler = () => {
                         className="border-b border-border/20 hover:bg-secondary/30 transition-all duration-300"
                         style={{ animationDelay: `${index * 100}ms` }}
                       >
-                        <TableCell className="p-6 font-semibold text-lg">
+                        <TableCell className="p-3 sm:p-6 font-semibold text-sm sm:text-lg">
                           {format(new Date(assignment.date), "EEEE, MMMM do, yyyy")}
                         </TableCell>
-                        <TableCell className="p-6">
-                          <div className="grid [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))] gap-3">
+                        <TableCell className="p-3 sm:p-6">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                             {assignment.assignments ? assignment.assignments.map((taskAssignment, memberIndex) => (
                               <div
                                 key={memberIndex}
                                 className={cn(
-                                  "inline-flex items-center gap-3 px-4 py-3 rounded-2xl font-semibold shadow-sm hover:shadow-md transition-all duration-300 w-full",
+                                  "inline-flex items-center gap-3 px-3 py-2 rounded-xl font-semibold shadow-sm hover:shadow-md transition-all duration-300 w-full min-w-0",
                                   taskAssignment.isCompleted && "opacity-75"
                                 )}
                                 style={{ backgroundColor: memberNameToColor[taskAssignment.memberName] || 'hsl(var(--primary))' }}
                               >
-                                <Avatar className="h-8 w-8 ring-2 ring-white/30" style={{ boxShadow: `0 0 0 2px ${memberNameToColor[taskAssignment.memberName]}33` }}>
+                                <Avatar className="h-6 w-6 flex-shrink-0 ring-2 ring-white/30" style={{ boxShadow: `0 0 0 2px ${memberNameToColor[taskAssignment.memberName]}33` }}>
                                   <AvatarImage alt={taskAssignment.memberName} src={avatarUrlForName(taskAssignment.memberName)} />
-                                  <AvatarFallback className="text-sm font-bold" style={{ color: getTextColorForBg(memberNameToColor[taskAssignment.memberName]) }}>
+                                  <AvatarFallback className="text-xs font-bold" style={{ color: getTextColorForBg(memberNameToColor[taskAssignment.memberName]) }}>
                                     {taskAssignment.memberName.slice(0,2).toUpperCase()}
                                   </AvatarFallback>
                                 </Avatar>
-                                <span className="text-white truncate">{taskAssignment.memberName}</span>
+                                <span className="text-white truncate text-sm">{taskAssignment.memberName}</span>
                                 {taskAssignment.isCompleted && (
-                                  <CheckSquare className="h-5 w-5 text-white ml-auto" />
+                                  <CheckSquare className="h-4 w-4 text-white ml-auto flex-shrink-0" />
                                 )}
                               </div>
                             )) : assignment.members.map((memberName, memberIndex) => (
                               <div
                                 key={memberIndex}
-                                className="inline-flex items-center gap-3 px-4 py-3 rounded-2xl font-semibold shadow-sm hover:shadow-md transition-all duration-300 w-full"
+                                className="inline-flex items-center gap-3 px-3 py-2 rounded-xl font-semibold shadow-sm hover:shadow-md transition-all duration-300 w-full min-w-0"
                                 style={{ backgroundColor: memberNameToColor[memberName] || 'hsl(var(--primary))' }}
                               >
-                                <Avatar className="h-8 w-8 ring-2 ring-white/30" style={{ boxShadow: `0 0 0 2px ${memberNameToColor[memberName]}33` }}>
+                                <Avatar className="h-6 w-6 flex-shrink-0 ring-2 ring-white/30" style={{ boxShadow: `0 0 0 2px ${memberNameToColor[memberName]}33` }}>
                                   <AvatarImage alt={memberName} src={avatarUrlForName(memberName)} />
-                                  <AvatarFallback className="text-sm font-bold" style={{ color: getTextColorForBg(memberNameToColor[memberName]) }}>
+                                  <AvatarFallback className="text-xs font-bold" style={{ color: getTextColorForBg(memberNameToColor[memberName]) }}>
                                     {memberName.slice(0,2).toUpperCase()}
                                   </AvatarFallback>
                                 </Avatar>
-                                <span className="text-white truncate">{memberName}</span>
+                                <span className="text-white truncate text-sm">{memberName}</span>
                               </div>
                             ))}
                           </div>
                         </TableCell>
-                                                 <TableCell className="p-6">
-                           <div className="grid [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))] gap-3">
+                                                 <TableCell className="p-3 sm:p-6">
+                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
                              {assignment.assignments ? assignment.assignments.map((taskAssignment, memberIndex) => (
-                               <div key={memberIndex} className="flex items-center gap-2">
+                               <div key={memberIndex} className="flex items-center gap-2 min-w-0">
                                  {taskAssignment.isCompleted ? (
                                    <div className="flex items-center gap-2 text-success">
-                                     <CheckSquare className="h-4 w-4" />
-                                     <span className="text-sm font-medium">Completed</span>
+                                     <CheckSquare className="h-4 w-4 flex-shrink-0" />
+                                     <span className="text-xs font-medium truncate">Completed</span>
                                    </div>
                                  ) : taskAssignment.swapStatus === 'pending' ? (
                                    <div className="flex items-center gap-2 text-warning">
-                                     <ArrowRightLeft className="h-4 w-4" />
-                                     <span className="text-sm font-medium">Swap Pending</span>
+                                     <ArrowRightLeft className="h-4 w-4 flex-shrink-0" />
+                                     <span className="text-xs font-medium truncate">Swap Pending</span>
                                    </div>
                                  ) : (
                                    <div className="flex items-center gap-2 text-muted-foreground">
-                                     <Square className="h-4 w-4" />
-                                     <span className="text-sm font-medium">Pending</span>
+                                     <Square className="h-4 w-4 flex-shrink-0" />
+                                     <span className="text-xs font-medium truncate">Pending</span>
                                    </div>
                                  )}
                                </div>
                              )) : assignment.members.map((memberName, memberIndex) => (
-                               <div key={memberIndex} className="flex items-center gap-2">
+                               <div key={memberIndex} className="flex items-center gap-2 min-w-0">
                                  <div className="flex items-center gap-2 text-muted-foreground">
-                                   <Square className="h-4 w-4" />
-                                   <span className="text-sm font-medium">Pending</span>
+                                   <Square className="h-4 w-4 flex-shrink-0" />
+                                   <span className="text-xs font-medium truncate">Pending</span>
                                  </div>
                                </div>
                              ))}
                            </div>
                          </TableCell>
-                         <TableCell className="p-6">
-                           <div className="grid [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))] gap-3">
+                         <TableCell className="p-3 sm:p-6">
+                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
                              {assignment.assignments ? assignment.assignments.map((taskAssignment, memberIndex) => (
-                               <div key={memberIndex} className="flex items-center gap-2">
+                               <div key={memberIndex} className="flex items-center gap-2 min-w-0">
                                  <DropdownMenu>
                                    <DropdownMenuTrigger asChild>
-                                     <Button variant="outline" size="sm" className="h-8 w-8 p-0">
-                                       <MoreHorizontal className="h-4 w-4" />
+                                     <Button variant="outline" size="sm" className="h-7 w-7 p-0 flex-shrink-0 mobile-touch-target">
+                                       <MoreHorizontal className="h-3 w-3" />
                                      </Button>
                                    </DropdownMenuTrigger>
                                    <DropdownMenuContent align="end">
@@ -1305,8 +1305,8 @@ export const RosterScheduler = () => {
                                  </DropdownMenu>
                                </div>
                              )) : assignment.members.map((memberName, memberIndex) => (
-                               <div key={memberIndex} className="flex items-center gap-2">
-                                 <div className="text-muted-foreground text-sm">No actions available</div>
+                               <div key={memberIndex} className="flex items-center gap-2 min-w-0">
+                                 <div className="text-muted-foreground text-xs">No actions available</div>
                                </div>
                              ))}
                            </div>
