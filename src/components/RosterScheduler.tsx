@@ -1173,14 +1173,14 @@ export const RosterScheduler = () => {
                         <TableCell className="p-3 sm:p-6">
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                             {assignment.assignments ? assignment.assignments.map((taskAssignment, memberIndex) => (
-                              <div
-                                key={memberIndex}
-                                className={cn(
-                                  "inline-flex items-center gap-3 px-3 py-2 rounded-xl font-semibold shadow-sm hover:shadow-md transition-all duration-300 w-full min-w-0",
-                                  taskAssignment.isCompleted && "opacity-75"
-                                )}
-                                style={{ backgroundColor: memberNameToColor[taskAssignment.memberName] || 'hsl(var(--primary))' }}
-                              >
+                                                             <div
+                                 key={memberIndex}
+                                 className={cn(
+                                   "inline-flex items-center gap-3 px-3 py-2 rounded-xl font-semibold shadow-sm hover:shadow-md transition-all duration-300 w-full min-w-0 h-10",
+                                   taskAssignment.isCompleted && "opacity-75"
+                                 )}
+                                 style={{ backgroundColor: memberNameToColor[taskAssignment.memberName] || 'hsl(var(--primary))' }}
+                               >
                                 <Avatar className="h-6 w-6 flex-shrink-0 ring-2 ring-white/30" style={{ boxShadow: `0 0 0 2px ${memberNameToColor[taskAssignment.memberName]}33` }}>
                                   <AvatarImage alt={taskAssignment.memberName} src={avatarUrlForName(taskAssignment.memberName)} />
                                   <AvatarFallback className="text-xs font-bold" style={{ color: getTextColorForBg(memberNameToColor[taskAssignment.memberName]) }}>
@@ -1193,11 +1193,11 @@ export const RosterScheduler = () => {
                                 )}
                               </div>
                             )) : assignment.members.map((memberName, memberIndex) => (
-                              <div
-                                key={memberIndex}
-                                className="inline-flex items-center gap-3 px-3 py-2 rounded-xl font-semibold shadow-sm hover:shadow-md transition-all duration-300 w-full min-w-0"
-                                style={{ backgroundColor: memberNameToColor[memberName] || 'hsl(var(--primary))' }}
-                              >
+                                                             <div
+                                 key={memberIndex}
+                                 className="inline-flex items-center gap-3 px-3 py-2 rounded-xl font-semibold shadow-sm hover:shadow-md transition-all duration-300 w-full min-w-0 h-10"
+                                 style={{ backgroundColor: memberNameToColor[memberName] || 'hsl(var(--primary))' }}
+                               >
                                 <Avatar className="h-6 w-6 flex-shrink-0 ring-2 ring-white/30" style={{ boxShadow: `0 0 0 2px ${memberNameToColor[memberName]}33` }}>
                                   <AvatarImage alt={memberName} src={avatarUrlForName(memberName)} />
                                   <AvatarFallback className="text-xs font-bold" style={{ color: getTextColorForBg(memberNameToColor[memberName]) }}>
@@ -1210,9 +1210,9 @@ export const RosterScheduler = () => {
                           </div>
                         </TableCell>
                                                  <TableCell className="p-3 sm:p-6">
-                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                              {assignment.assignments ? assignment.assignments.map((taskAssignment, memberIndex) => (
-                               <div key={memberIndex} className="flex items-center gap-2 min-w-0">
+                               <div key={memberIndex} className="flex items-center gap-2 min-w-0 h-10">
                                  {taskAssignment.isCompleted ? (
                                    <div className="flex items-center gap-2 text-success">
                                      <CheckSquare className="h-4 w-4 flex-shrink-0" />
@@ -1231,7 +1231,7 @@ export const RosterScheduler = () => {
                                  )}
                                </div>
                              )) : assignment.members.map((memberName, memberIndex) => (
-                               <div key={memberIndex} className="flex items-center gap-2 min-w-0">
+                               <div key={memberIndex} className="flex items-center gap-2 min-w-0 h-10">
                                  <div className="flex items-center gap-2 text-muted-foreground">
                                    <Square className="h-4 w-4 flex-shrink-0" />
                                    <span className="text-xs font-medium truncate">Pending</span>
@@ -1241,9 +1241,9 @@ export const RosterScheduler = () => {
                            </div>
                          </TableCell>
                          <TableCell className="p-3 sm:p-6">
-                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                              {assignment.assignments ? assignment.assignments.map((taskAssignment, memberIndex) => (
-                               <div key={memberIndex} className="flex items-center gap-2 min-w-0">
+                               <div key={memberIndex} className="flex items-center gap-2 min-w-0 h-10">
                                  <DropdownMenu>
                                    <DropdownMenuTrigger asChild>
                                      <Button variant="outline" size="sm" className="h-7 w-7 p-0 flex-shrink-0 mobile-touch-target">
@@ -1305,7 +1305,7 @@ export const RosterScheduler = () => {
                                  </DropdownMenu>
                                </div>
                              )) : assignment.members.map((memberName, memberIndex) => (
-                               <div key={memberIndex} className="flex items-center gap-2 min-w-0">
+                               <div key={memberIndex} className="flex items-center gap-2 min-w-0 h-10">
                                  <div className="text-muted-foreground text-xs">No actions available</div>
                                </div>
                              ))}
