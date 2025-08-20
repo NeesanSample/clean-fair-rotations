@@ -755,20 +755,64 @@ export const RosterScheduler = () => {
 
       if (error2) throw error2;
 
-      // Refresh assignments to show updated status
-      if (selectedRosterId) {
-        await handleSelectRoster(selectedRosterId);
-      }
+             // Refresh assignments to show updated status
+       if (selectedRosterId) {
+         await handleSelectRoster(selectedRosterId);
+         // Also refresh the rosters list to ensure consistency
+         await loadRosters();
+       } else {
+         // If no roster is selected, we need to refresh the assignments from the database
+         // This handles the case where assignments were swapped but not saved yet
+         try {
+           const { data: dbAssignments, error: assignError } = await supabase
+             .from('cleaning_assignments')
+             .select('*')
+             .order('assignment_date', { ascending: true });
+           
+           if (!assignError && dbAssignments) {
+             // Group assignments by date with detailed information
+             const grouped: Record<string, any[]> = {};
+             dbAssignments.forEach((a: any) => {
+               const key = a.assignment_date;
+               if (!grouped[key]) grouped[key] = [];
+               const mem = members.find((m: any) => m.id === a.member_id);
+               if (mem) {
+                 grouped[key].push({
+                   id: a.id,
+                   memberId: a.member_id,
+                   memberName: mem.name,
+                   isCompleted: a.is_completed,
+                   completedAt: a.completed_at,
+                   completedBy: a.completed_by,
+                   swappedWith: a.swapped_with,
+                   swapRequestedAt: a.swap_requested_at,
+                   swapRequestedBy: a.swap_requested_by,
+                   swapStatus: a.swap_status
+                 });
+               }
+             });
+             
+             const builtAssignments = Object.keys(grouped).sort().map(date => ({ 
+               date, 
+               members: grouped[date].map(a => a.memberName),
+               assignments: grouped[date]
+             }));
+             setAssignments(builtAssignments);
+           }
+         } catch (refreshError) {
+           console.error('Error refreshing assignments after swap:', refreshError);
+         }
+       }
 
-      setSwapDialogOpen(false);
-      setSelectedAssignmentForSwap(null);
-      setSwapTargetDate("");
-      setSwapTargetMember("");
+       setSwapDialogOpen(false);
+       setSelectedAssignmentForSwap(null);
+       setSwapTargetDate("");
+       setSwapTargetMember("");
 
-      toast({
-        title: "Swap Completed! 🔄",
-        description: `${selectedAssignmentForSwap.memberName} and ${swapTargetMember} have swapped tasks`,
-      });
+       toast({
+         title: "Swap Completed! 🔄",
+         description: `${selectedAssignmentForSwap.memberName} and ${swapTargetMember} have swapped tasks`,
+       });
     } catch (error) {
       console.error('Error executing swap:', error);
       toast({
