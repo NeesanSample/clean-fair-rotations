@@ -21,6 +21,13 @@ export type Database = {
           id: string
           member_id: string
           roster_id: string
+          is_completed: boolean
+          completed_at: string | null
+          completed_by: string | null
+          swapped_with: string | null
+          swap_requested_at: string | null
+          swap_requested_by: string | null
+          swap_status: 'pending' | 'accepted' | 'rejected' | 'cancelled' | null
         }
         Insert: {
           assignment_date: string
@@ -28,6 +35,13 @@ export type Database = {
           id?: string
           member_id: string
           roster_id: string
+          is_completed?: boolean
+          completed_at?: string | null
+          completed_by?: string | null
+          swapped_with?: string | null
+          swap_requested_at?: string | null
+          swap_requested_by?: string | null
+          swap_status?: 'pending' | 'accepted' | 'rejected' | 'cancelled' | null
         }
         Update: {
           assignment_date?: string
@@ -35,6 +49,13 @@ export type Database = {
           id?: string
           member_id?: string
           roster_id?: string
+          is_completed?: boolean
+          completed_at?: string | null
+          completed_by?: string | null
+          swapped_with?: string | null
+          swap_requested_at?: string | null
+          swap_requested_by?: string | null
+          swap_status?: 'pending' | 'accepted' | 'rejected' | 'cancelled' | null
         }
         Relationships: [
           {
@@ -49,6 +70,27 @@ export type Database = {
             columns: ["roster_id"]
             isOneToOne: false
             referencedRelation: "rosters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cleaning_assignments_completed_by_fkey"
+            columns: ["completed_by"]
+            isOneToOne: false
+            referencedRelation: "roster_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cleaning_assignments_swapped_with_fkey"
+            columns: ["swapped_with"]
+            isOneToOne: false
+            referencedRelation: "roster_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cleaning_assignments_swap_requested_by_fkey"
+            columns: ["swap_requested_by"]
+            isOneToOne: false
+            referencedRelation: "roster_members"
             referencedColumns: ["id"]
           },
         ]

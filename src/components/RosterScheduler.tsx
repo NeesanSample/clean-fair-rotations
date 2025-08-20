@@ -6,9 +6,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Plus, Trash2, Users, Calendar as CalendarDays, Clock, CheckCircle, AlertCircle, Sparkles } from "lucide-react";
+import { CalendarIcon, Plus, Trash2, Users, Calendar as CalendarDays, Clock, CheckCircle, AlertCircle, Sparkles, Loader2, RefreshCw, Trash, CheckSquare, Square, ArrowRightLeft, MoreHorizontal } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -23,6 +25,18 @@ interface Member {
 interface Assignment {
   date: string;
   members: string[];
+  assignments?: Array<{
+    id: string;
+    memberId: string;
+    memberName: string;
+    isCompleted: boolean;
+    completedAt?: string;
+    completedBy?: string;
+    swappedWith?: string;
+    swapRequestedAt?: string;
+    swapRequestedBy?: string;
+    swapStatus?: 'pending' | 'accepted' | 'rejected' | 'cancelled';
+  }>;
 }
 
 export const RosterScheduler = () => {
@@ -34,6 +48,21 @@ export const RosterScheduler = () => {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [previewWeeks, setPreviewWeeks] = useState<string[][]>([]);
+  const [isStartOpen, setIsStartOpen] = useState(false);
+  const [isEndOpen, setIsEndOpen] = useState(false);
+  const [rosters, setRosters] = useState<any[]>([]);
+  const [selectedRosterId, setSelectedRosterId] = useState<string>("");
+  const [isLoadingRosters, setIsLoadingRosters] = useState(false);
+  const [isHydrating, setIsHydrating] = useState(false);
+  const [swapDialogOpen, setSwapDialogOpen] = useState(false);
+  const [selectedAssignmentForSwap, setSelectedAssignmentForSwap] = useState<{
+    assignmentId: string;
+    memberId: string;
+    memberName: string;
+    date: string;
+  } | null>(null);
+  const [swapTargetDate, setSwapTargetDate] = useState<string>("");
+  const [swapTargetMember, setSwapTargetMember] = useState<string>("");
   
   const { toast } = useToast();
 
@@ -91,6 +120,118 @@ export const RosterScheduler = () => {
     return map;
   }, [members]);
 
+  // Load saved rosters
+  const loadRosters = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('rosters')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setRosters(data || []);
+    } catch (e) {
+      toast({ title: 'Error', description: 'Failed to load rosters', variant: 'destructive' });
+    }
+  };
+
+  useEffect(() => {
+    loadRosters();
+  }, []);
+
+  const handleSelectRoster = async (rosterId: string) => {
+    try {
+      setIsHydrating(true);
+      setSelectedRosterId(rosterId);
+      const { data: roster, error: rosterError } = await supabase
+        .from('rosters')
+        .select('*')
+        .eq('id', rosterId)
+        .single();
+      if (rosterError) throw rosterError;
+
+      const { data: dbMembers, error: membersError } = await supabase
+        .from('roster_members')
+        .select('*')
+        .eq('roster_id', rosterId);
+      if (membersError) throw membersError;
+
+      const { data: dbAssignments, error: assignError } = await supabase
+        .from('cleaning_assignments')
+        .select('*')
+        .eq('roster_id', rosterId)
+        .order('assignment_date', { ascending: true });
+      if (assignError) throw assignError;
+
+      setRosterName(roster?.name || '');
+      setStartDate(roster?.start_date ? new Date(roster.start_date) : undefined);
+      setEndDate(roster?.end_date ? new Date(roster.end_date) : undefined);
+
+      const loadedMembers: Member[] = (dbMembers || []).map((m: any, idx: number) => ({
+        id: m.id,
+        name: m.name,
+        color: generateColorForIndex(idx)
+      }));
+      setMembers(loadedMembers);
+
+      // Group assignments by date with detailed information
+      const grouped: Record<string, any[]> = {};
+      (dbAssignments || []).forEach((a: any) => {
+        const key = a.assignment_date;
+        if (!grouped[key]) grouped[key] = [];
+        const mem = (dbMembers || []).find((m: any) => m.id === a.member_id);
+        if (mem) {
+          grouped[key].push({
+            id: a.id,
+            memberId: a.member_id,
+            memberName: mem.name,
+            isCompleted: a.is_completed,
+            completedAt: a.completed_at,
+            completedBy: a.completed_by,
+            swappedWith: a.swapped_with,
+            swapRequestedAt: a.swap_requested_at,
+            swapRequestedBy: a.swap_requested_by,
+            swapStatus: a.swap_status
+          });
+        }
+      });
+      
+      const builtAssignments = Object.keys(grouped).sort().map(date => ({ 
+        date, 
+        members: grouped[date].map(a => a.memberName),
+        assignments: grouped[date]
+      }));
+      setAssignments(builtAssignments);
+      toast({ title: 'Roster Loaded', description: `Loaded "${roster?.name}"` });
+    } catch (e) {
+      toast({ title: 'Error', description: 'Failed to load roster', variant: 'destructive' });
+    } finally {
+      setIsHydrating(false);
+    }
+  };
+
+  const handleDeleteRoster = async (rosterId: string) => {
+    try {
+      const { error: da } = await supabase.from('cleaning_assignments').delete().eq('roster_id', rosterId);
+      if (da) throw da;
+      const { error: dm } = await supabase.from('roster_members').delete().eq('roster_id', rosterId);
+      if (dm) throw dm;
+      const { error: dr } = await supabase.from('rosters').delete().eq('id', rosterId);
+      if (dr) throw dr;
+      toast({ title: 'Deleted', description: 'Roster deleted successfully' });
+      if (selectedRosterId === rosterId) {
+        setSelectedRosterId("");
+        setRosterName("");
+        setStartDate(undefined);
+        setEndDate(undefined);
+        setMembers([]);
+        setAssignments([]);
+      }
+      loadRosters();
+    } catch (e) {
+      toast({ title: 'Error', description: 'Failed to delete roster', variant: 'destructive' });
+    }
+  };
+
   const memberIdToColor = useMemo(() => {
     const map: { [key: string]: string } = {};
     members.forEach(m => { map[m.id] = m.color; });
@@ -102,6 +243,14 @@ export const RosterScheduler = () => {
     members.forEach(m => { map[m.name] = m.color; });
     return map;
   }, [members]);
+
+  const assignedCounts = useMemo(() => {
+    const map: { [name: string]: number } = {};
+    assignments.forEach(a => a.members.forEach(n => {
+      map[n] = (map[n] || 0) + 1;
+    }));
+    return map;
+  }, [assignments]);
 
   const generateBalancedPreview = (weeks: number) => {
     if (members.length < 2 || weeks <= 0) return [] as string[][];
@@ -133,7 +282,7 @@ export const RosterScheduler = () => {
     } else {
       setPreviewWeeks([]);
     }
-    setAssignments([]);
+    // Do not clear assignments on member changes; preserve loaded schedules
   }, [members]);
 
   const removeMember = (id: string) => {
@@ -224,11 +373,26 @@ export const RosterScheduler = () => {
 
       newAssignments.push({
         date: format(sundays[weekIndex], "yyyy-MM-dd"),
-        members: chosen.map(c => c.name)
+        members: chosen.map(c => c.name),
+        assignments: chosen.map(c => ({
+          id: '', // Will be set when saved to DB
+          memberId: c.id,
+          memberName: c.name,
+          isCompleted: false
+        }))
       });
     }
 
     setAssignments(newAssignments);
+    // Auto-persist the schedule so it shows after reload/load
+    if (rosterName.trim()) {
+      persistRoster(rosterName.trim(), startDate, endDate, members, newAssignments)
+        .then(() => loadRosters())
+        .catch(() => {
+          // Non-blocking error toast
+          toast({ title: 'Warning', description: 'Generated schedule, but failed to persist automatically.', variant: 'destructive' });
+        });
+    }
     
     toast({
       title: "Schedule Generated! ✨",
@@ -239,6 +403,107 @@ export const RosterScheduler = () => {
   const calculateSelectedWeeks = () => {
     if (!startDate || !endDate) return 0;
     return getSundays(startDate, endDate).length;
+  };
+
+  // Persist roster by name (override if exists)
+  const persistRoster = async (
+    name: string,
+    start: Date,
+    end: Date,
+    currentMembers: Member[],
+    currentAssignments: Assignment[]
+  ) => {
+    const startStr = format(start, "yyyy-MM-dd");
+    const endStr = format(end, "yyyy-MM-dd");
+
+    const { data: existing, error: findError } = await supabase
+      .from('rosters')
+      .select('*')
+      .eq('name', name)
+      .limit(1);
+    if (findError) throw findError;
+
+    let rosterId: string;
+    const isUpdate = Array.isArray(existing) && existing.length > 0;
+
+    if (isUpdate) {
+      rosterId = (existing as any[])[0].id;
+      const { error: updateError } = await supabase
+        .from('rosters')
+        .update({ start_date: startStr, end_date: endStr })
+        .eq('id', rosterId);
+      if (updateError) throw updateError;
+      const { error: delAssign } = await supabase
+        .from('cleaning_assignments')
+        .delete()
+        .eq('roster_id', rosterId);
+      if (delAssign) throw delAssign;
+      const { error: delMembers } = await supabase
+        .from('roster_members')
+        .delete()
+        .eq('roster_id', rosterId);
+      if (delMembers) throw delMembers;
+    } else {
+      const { data: inserted, error: insertError } = await supabase
+        .from('rosters')
+        .insert({ name, start_date: startStr, end_date: endStr })
+        .select()
+        .single();
+      if (insertError) throw insertError;
+      rosterId = (inserted as any).id;
+    }
+
+    const memberInserts = currentMembers.map(m => ({ roster_id: rosterId, name: m.name }));
+    const { data: savedMembers, error: membersError } = await supabase
+      .from('roster_members')
+      .insert(memberInserts)
+      .select();
+    if (membersError) throw membersError;
+
+    const memberNameToId: { [key: string]: string } = {};
+    (savedMembers as any[]).forEach(member => {
+      memberNameToId[member.name] = member.id;
+    });
+
+    const assignmentInserts: any[] = [];
+    currentAssignments.forEach(a => {
+      if (a.assignments) {
+        // Use detailed assignment data if available
+        a.assignments.forEach(assignment => {
+          const memberId = memberNameToId[assignment.memberName];
+          if (memberId) {
+            assignmentInserts.push({ 
+              roster_id: rosterId, 
+              member_id: memberId, 
+              assignment_date: a.date,
+              is_completed: assignment.isCompleted || false,
+              completed_at: assignment.completedAt || null,
+              completed_by: assignment.completedBy || null,
+              swapped_with: assignment.swappedWith || null,
+              swap_requested_at: assignment.swapRequestedAt || null,
+              swap_requested_by: assignment.swapRequestedBy || null,
+              swap_status: assignment.swapStatus || null
+            });
+          }
+        });
+      } else {
+        // Fallback to simple member names
+        a.members.forEach(memberName => {
+          const memberId = memberNameToId[memberName];
+          if (memberId) {
+            assignmentInserts.push({ roster_id: rosterId, member_id: memberId, assignment_date: a.date });
+          }
+        });
+      }
+    });
+    if (assignmentInserts.length > 0) {
+      const { error: aErr } = await supabase
+        .from('cleaning_assignments')
+        .insert(assignmentInserts);
+      if (aErr) throw aErr;
+    }
+
+    return { rosterId, isUpdate };
   };
 
   const saveRoster = async () => {
@@ -253,64 +518,13 @@ export const RosterScheduler = () => {
 
     setIsLoading(true);
     try {
-      const { data: roster, error: rosterError } = await supabase
-        .from('rosters')
-        .insert({
-          name: rosterName.trim(),
-          start_date: format(startDate, "yyyy-MM-dd"),
-          end_date: format(endDate, "yyyy-MM-dd")
-        })
-        .select()
-        .single();
-
-      if (rosterError) throw rosterError;
-
-      const memberInserts = members.map(member => ({
-        roster_id: roster.id,
-        name: member.name
-      }));
-
-      const { data: savedMembers, error: membersError } = await supabase
-        .from('roster_members')
-        .insert(memberInserts)
-        .select();
-
-      if (membersError) throw membersError;
-
-      const memberNameToId: { [key: string]: string } = {};
-      savedMembers.forEach(member => {
-        memberNameToId[member.name] = member.id;
-      });
-
-      const assignmentInserts: any[] = [];
-      assignments.forEach(assignment => {
-        assignment.members.forEach(memberName => {
-          if (memberNameToId[memberName]) {
-            assignmentInserts.push({
-              roster_id: roster.id,
-              member_id: memberNameToId[memberName],
-              assignment_date: assignment.date
-            });
-          }
-        });
-      });
-
-      const { error: assignmentsError } = await supabase
-        .from('cleaning_assignments')
-        .insert(assignmentInserts);
-
-      if (assignmentsError) throw assignmentsError;
-
+      const name = rosterName.trim();
+      const { isUpdate } = await persistRoster(name, startDate, endDate, members, assignments);
+      loadRosters();
       toast({
-        title: "Roster Saved Successfully! 🎉",
-        description: `"${rosterName}" saved with ${assignments.length} weeks of assignments`
+        title: isUpdate ? "Roster Updated" : "Roster Saved Successfully! 🎉",
+        description: `${isUpdate ? 'Updated' : 'Saved'} "${rosterName}" with ${assignments.length} weeks`
       });
-
-      setRosterName("");
-      setStartDate(undefined);
-      setEndDate(undefined);
-      setMembers([]);
-      setAssignments([]);
 
     } catch (error) {
       console.error('Error saving roster:', error);
@@ -321,6 +535,247 @@ export const RosterScheduler = () => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Task completion and swapping functions
+  const markTaskCompleted = async (assignmentId: string, memberId: string) => {
+    try {
+      const { error } = await supabase
+        .from('cleaning_assignments')
+        .update({
+          is_completed: true,
+          completed_at: new Date().toISOString(),
+          completed_by: memberId
+        })
+        .eq('id', assignmentId);
+      
+      if (error) throw error;
+      
+      // Refresh assignments to show updated status
+      if (selectedRosterId) {
+        await handleSelectRoster(selectedRosterId);
+      }
+      
+      toast({
+        title: "Task Completed! ✅",
+        description: "Cleaning task has been marked as completed",
+      });
+    } catch (error) {
+      console.error('Error marking task completed:', error);
+      toast({
+        title: "Error",
+        description: "Failed to mark task as completed",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const markTaskIncomplete = async (assignmentId: string) => {
+    try {
+      const { error } = await supabase
+        .from('cleaning_assignments')
+        .update({
+          is_completed: false,
+          completed_at: null,
+          completed_by: null
+        })
+        .eq('id', assignmentId);
+      
+      if (error) throw error;
+      
+      // Refresh assignments to show updated status
+      if (selectedRosterId) {
+        await handleSelectRoster(selectedRosterId);
+      }
+      
+      toast({
+        title: "Task Reopened",
+        description: "Cleaning task has been marked as incomplete",
+      });
+    } catch (error) {
+      console.error('Error marking task incomplete:', error);
+      toast({
+        title: "Error",
+        description: "Failed to reopen task",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const requestTaskSwap = async (assignmentId: string, requestingMemberId: string, targetMemberId: string) => {
+    try {
+      const { error } = await supabase
+        .from('cleaning_assignments')
+        .update({
+          swap_requested_at: new Date().toISOString(),
+          swap_requested_by: requestingMemberId,
+          swapped_with: targetMemberId,
+          swap_status: 'pending'
+        })
+        .eq('id', assignmentId);
+      
+      if (error) throw error;
+      
+      // Refresh assignments to show updated status
+      if (selectedRosterId) {
+        await handleSelectRoster(selectedRosterId);
+      }
+      
+      toast({
+        title: "Swap Requested",
+        description: "Task swap request has been sent",
+      });
+    } catch (error) {
+      console.error('Error requesting task swap:', error);
+      toast({
+        title: "Error",
+        description: "Failed to request task swap",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const respondToSwapRequest = async (assignmentId: string, response: 'accepted' | 'rejected') => {
+    try {
+      const { error } = await supabase
+        .from('cleaning_assignments')
+        .update({
+          swap_status: response
+        })
+        .eq('id', assignmentId);
+      
+      if (error) throw error;
+      
+      // If accepted, swap the assignments
+      if (response === 'accepted') {
+        // This would require additional logic to actually swap the assignments
+        // For now, we'll just update the status
+        toast({
+          title: "Swap Accepted",
+          description: "Task swap has been accepted",
+        });
+      } else {
+        toast({
+          title: "Swap Rejected",
+          description: "Task swap has been rejected",
+        });
+      }
+      
+      // Refresh assignments to show updated status
+      if (selectedRosterId) {
+        await handleSelectRoster(selectedRosterId);
+      }
+    } catch (error) {
+      console.error('Error responding to swap request:', error);
+      toast({
+        title: "Error",
+        description: "Failed to respond to swap request",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const openSwapDialog = (assignmentId: string, memberId: string, memberName: string, date: string) => {
+    setSelectedAssignmentForSwap({
+      assignmentId,
+      memberId,
+      memberName,
+      date
+    });
+    setSwapDialogOpen(true);
+  };
+
+  const executeSwap = async () => {
+    if (!selectedAssignmentForSwap || !swapTargetDate || !swapTargetMember) return;
+
+    try {
+      // Check if we have valid assignment IDs (not empty strings)
+      if (!selectedAssignmentForSwap.assignmentId || selectedAssignmentForSwap.assignmentId === '') {
+        toast({
+          title: "Error",
+          description: "Cannot swap unsaved assignments. Please save the roster first.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Find the target member's assignment for the target date
+      const targetAssignment = assignments
+        .find(a => a.date === swapTargetDate)
+        ?.assignments?.find(ta => ta.memberName === swapTargetMember);
+
+      if (!targetAssignment) {
+        toast({
+          title: "Error",
+          description: "Target member is not assigned to the selected date",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Check if the target assignment has a valid ID
+      if (!targetAssignment.id || targetAssignment.id === '') {
+        toast({
+          title: "Error",
+          description: "Cannot swap with unsaved assignment. Please save the roster first.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Check if the target assignment is completed
+      if (targetAssignment.isCompleted) {
+        toast({
+          title: "Error",
+          description: "Cannot swap with a completed task",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Update both assignments to swap them
+      const { error: error1 } = await supabase
+        .from('cleaning_assignments')
+        .update({
+          member_id: targetAssignment.memberId,
+          assignment_date: selectedAssignmentForSwap.date
+        })
+        .eq('id', selectedAssignmentForSwap.assignmentId);
+
+      if (error1) throw error1;
+
+      const { error: error2 } = await supabase
+        .from('cleaning_assignments')
+        .update({
+          member_id: selectedAssignmentForSwap.memberId,
+          assignment_date: swapTargetDate
+        })
+        .eq('id', targetAssignment.id);
+
+      if (error2) throw error2;
+
+      // Refresh assignments to show updated status
+      if (selectedRosterId) {
+        await handleSelectRoster(selectedRosterId);
+      }
+
+      setSwapDialogOpen(false);
+      setSelectedAssignmentForSwap(null);
+      setSwapTargetDate("");
+      setSwapTargetMember("");
+
+      toast({
+        title: "Swap Completed! 🔄",
+        description: `${selectedAssignmentForSwap.memberName} and ${swapTargetMember} have swapped tasks`,
+      });
+    } catch (error) {
+      console.error('Error executing swap:', error);
+      toast({
+        title: "Error",
+        description: "Failed to execute task swap",
+        variant: "destructive"
+      });
     }
   };
 
@@ -342,11 +797,11 @@ export const RosterScheduler = () => {
           </div>
           <div className="space-y-4">
             <h1 className="text-6xl font-bold bg-gradient-primary bg-clip-text text-transparent leading-tight">
-              House Cleaning Roster
-            </h1>
+            House Cleaning Roster
+          </h1>
             <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
               Create fair and balanced cleaning schedules for your household members with intelligent distribution
-            </p>
+          </p>
           </div>
         </div>
 
@@ -359,27 +814,27 @@ export const RosterScheduler = () => {
                   <div className="p-3 bg-gradient-primary rounded-2xl">
                     <CalendarDays className="h-6 w-6 text-primary-foreground" />
                   </div>
-                  Setup Roster
-                </CardTitle>
+                Setup Roster
+              </CardTitle>
                 <CardDescription className="text-lg text-muted-foreground">
-                  Configure your cleaning schedule parameters
-                </CardDescription>
-              </CardHeader>
+                Configure your cleaning schedule parameters
+              </CardDescription>
+            </CardHeader>
               <CardContent className="space-y-8">
-                {/* Roster Name */}
+              {/* Roster Name */}
                 <div className="space-y-3">
                   <Label htmlFor="roster-name" className="text-sm font-semibold">Roster Name</Label>
-                  <Input
-                    id="roster-name"
-                    placeholder="e.g., January Cleaning Schedule"
-                    value={rosterName}
-                    onChange={(e) => setRosterName(e.target.value)}
+                <Input
+                  id="roster-name"
+                  placeholder="e.g., January Cleaning Schedule"
+                  value={rosterName}
+                  onChange={(e) => setRosterName(e.target.value)}
                     className="h-12 border-2 border-border/50 focus:border-primary focus:ring-primary/20 rounded-xl transition-all duration-300"
-                  />
-                </div>
+                />
+              </div>
 
                 {/* Team Members */}
-                <div className="space-y-4">
+              <div className="space-y-4">
                   <Label className="text-sm font-semibold">Team Members</Label>
                   <div className="flex gap-3">
                     <Input
@@ -467,6 +922,39 @@ export const RosterScheduler = () => {
                 )}
               </CardContent>
             </Card>
+
+            {/* Saved Rosters Management */}
+            <Card className="card-modern hover:shadow-glow transition-all duration-500">
+              <CardHeader className="pb-6">
+                <CardTitle className="flex items-center gap-4 text-2xl">
+                  <div className="p-3 bg-gradient-secondary rounded-2xl">
+                    <Users className="h-6 w-6 text-primary" />
+                  </div>
+                  Saved Rosters
+                  <Button variant="outline" size="sm" className="ml-auto rounded-xl" onClick={loadRosters} disabled={isLoadingRosters}>
+                    {isLoadingRosters ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                  </Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {rosters.length === 0 ? (
+                  <div className="text-sm text-muted-foreground">No saved rosters yet.</div>
+                ) : (
+                  <div className="space-y-2">
+                    {rosters.map((r: any) => (
+                      <div key={r.id} className="flex items-center gap-3 p-3 rounded-xl ring-1 ring-border hover:bg-secondary/30 transition-all">
+                        <div className="font-semibold truncate">{r.name}</div>
+                        <div className="text-xs text-muted-foreground ml-auto">{format(new Date(r.start_date), 'MMM d, yyyy')} - {format(new Date(r.end_date), 'MMM d, yyyy')}</div>
+                        <Button size="sm" className="rounded-xl" variant="secondary" onClick={() => handleSelectRoster(r.id)}>Load</Button>
+                        <Button size="sm" className="rounded-xl" variant="destructive" onClick={() => handleDeleteRoster(r.id)}>
+                          <Trash className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
 
           {/* Schedule Configuration */}
@@ -482,10 +970,10 @@ export const RosterScheduler = () => {
               </CardHeader>
               <CardContent className="space-y-8">
                 {/* Date Range */}
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-3">
-                    <Label className="text-sm font-semibold">Start Date</Label>
-                    <Popover>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <Label className="block mb-1 text-sm font-semibold">Start Date</Label>
+                    <Popover open={isStartOpen} onOpenChange={setIsStartOpen}>
                       <PopoverTrigger asChild>
                         <Button
                           variant="outline"
@@ -495,23 +983,30 @@ export const RosterScheduler = () => {
                           )}
                         >
                           <CalendarIcon className="mr-3 h-5 w-5" />
-                          {startDate ? format(startDate, "PPP") : "Pick start date"}
+                          {startDate ? format(startDate, "PPP") : "Select start date"}
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0 glass border-2 border-border/30" align="start">
                         <Calendar
                           mode="single"
                           selected={startDate}
-                          onSelect={setStartDate}
+                          onSelect={(date) => {
+                            if (date) {
+                              setStartDate(date);
+                              if (endDate && endDate < date) setEndDate(date);
+                              setIsStartOpen(false);
+                            }
+                          }}
+                          disabled={(date: Date) => !!endDate && date > endDate}
                           initialFocus
                         />
                       </PopoverContent>
                     </Popover>
                   </div>
 
-                  <div className="space-y-3">
-                    <Label className="text-sm font-semibold">End Date</Label>
-                    <Popover>
+                  <div className="space-y-4">
+                    <Label className="block mb-1 text-sm font-semibold">End Date</Label>
+                    <Popover open={isEndOpen} onOpenChange={setIsEndOpen}>
                       <PopoverTrigger asChild>
                         <Button
                           variant="outline"
@@ -521,20 +1016,27 @@ export const RosterScheduler = () => {
                           )}
                         >
                           <CalendarIcon className="mr-3 h-5 w-5" />
-                          {endDate ? format(endDate, "PPP") : "Pick end date"}
+                          {endDate ? format(endDate, "PPP") : "Select end date"}
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0 glass border-2 border-border/30" align="start">
                         <Calendar
                           mode="single"
                           selected={endDate}
-                          onSelect={setEndDate}
+                          onSelect={(date) => {
+                            if (date) {
+                              setEndDate(date);
+                              if (startDate && startDate > date) setStartDate(date);
+                              setIsEndOpen(false);
+                            }
+                          }}
+                          disabled={(date: Date) => !!startDate && date < startDate}
                           initialFocus
                         />
                       </PopoverContent>
                     </Popover>
-                  </div>
                 </div>
+              </div>
 
                 {/* Date Analysis */}
                 {startDate && endDate && members.length >= 2 && (
@@ -547,8 +1049,8 @@ export const RosterScheduler = () => {
                       <div className="flex items-center justify-between">
                         <span className="text-muted-foreground">Minimum needed:</span>
                         <span className="font-bold text-accent text-xl">{weeksNeeded}</span>
-                      </div>
-                      
+                </div>
+                
                       {selectedWeeks < weeksNeeded && (
                         <div className="p-4 bg-warning/10 border-2 border-warning/20 rounded-xl">
                           <div className="flex items-center gap-3">
@@ -557,8 +1059,8 @@ export const RosterScheduler = () => {
                               Consider selecting at least {weeksNeeded} weeks for optimal distribution
                             </span>
                           </div>
-                        </div>
-                      )}
+                  </div>
+                )}
                       
                       {selectedWeeks >= weeksNeeded && (
                         <div className="p-4 bg-success/10 border-2 border-success/20 rounded-xl">
@@ -566,40 +1068,40 @@ export const RosterScheduler = () => {
                             <CheckCircle className="h-5 w-5 text-success shrink-0" />
                             <span className="text-success font-medium">
                               Perfect! Your schedule allows for fair distribution
-                            </span>
-                          </div>
+                        </span>
+                      </div>
                         </div>
                       )}
                     </div>
                   </div>
-                )}
+              )}
 
                 {/* Action Buttons */}
                 <div className="space-y-4">
-                  <Button 
-                    onClick={generateSchedule} 
+                <Button 
+                  onClick={generateSchedule} 
                     disabled={members.length < 2 || !startDate || !endDate}
                     size="lg"
                     className="w-full btn-gradient h-14 rounded-xl font-bold text-lg transform active:scale-95"
-                  >
+                >
                     <Sparkles className="h-5 w-5 mr-3" />
-                    Generate Schedule
-                  </Button>
+                  Generate Schedule
+                </Button>
 
-                  {assignments.length > 0 && (
-                    <Button 
-                      onClick={saveRoster}
+                {assignments.length > 0 && (
+                  <Button 
+                    onClick={saveRoster} 
                       disabled={isLoading || !rosterName.trim()}
                       size="lg"
                       variant="outline"
                       className="w-full h-12 rounded-xl font-semibold border-2 border-primary/30 hover:bg-primary hover:text-primary-foreground"
-                    >
-                      {isLoading ? "Saving..." : "Save Roster"}
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+                  >
+                    {isLoading ? "Saving..." : "Save Roster"}
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
           </div>
         </div>
 
@@ -618,12 +1120,44 @@ export const RosterScheduler = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
+              {/* Assigned counts summary */}
+              <div className="glass p-4 rounded-xl border-2 border-border/20 mb-6">
+                <div className="text-sm font-semibold text-muted-foreground mb-3">Counts</div>
+                <div className="grid [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))] gap-3">
+                  {Object.keys(assignedCounts).length > 0 ? (
+                    Object.entries(assignedCounts)
+                      .sort((a, b) => a[0].localeCompare(b[0]))
+                      .map(([name, count]) => (
+                        <div key={name} className="flex items-center gap-3 rounded-lg p-3 ring-1 ring-border w-full" style={{ backgroundColor: memberNameToColor[name] }}>
+                          <Avatar className="h-8 w-8 ring-2 ring-offset-2 ring-offset-background" style={{ boxShadow: `0 0 0 3px ${memberNameToColor[name]}33` }}>
+                            <AvatarImage alt={name} src={avatarUrlForName(name)} />
+                            <AvatarFallback>{name.slice(0,2).toUpperCase()}</AvatarFallback>
+                          </Avatar>
+                          <span className="font-semibold truncate" style={{ color: getTextColorForBg(memberNameToColor[name]) }}>{name}</span>
+                          <span
+                            className="ml-auto text-xs font-medium px-2.5 py-1 rounded-full"
+                            style={{
+                              backgroundColor: getTextColorForBg(memberNameToColor[name]) === 'white' ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.15)',
+                              color: getTextColorForBg(memberNameToColor[name])
+                            }}
+                          >
+                            {count} Count{count === 1 ? '' : 's'}
+                          </span>
+                        </div>
+                      ))
+                  ) : (
+                    <div className="text-xs text-muted-foreground">No assignments yet</div>
+                  )}
+                        </div>
+                      </div>
               <div className="overflow-hidden rounded-2xl border-2 border-border/30">
-                <Table>
+                <Table className="w-full">
                   <TableHeader>
                     <TableRow className="bg-gradient-secondary border-b-2 border-border/30 hover:bg-gradient-secondary">
                       <TableHead className="font-bold text-foreground text-lg p-6">Date</TableHead>
-                      <TableHead className="font-bold text-foreground text-lg p-6">Assigned Members</TableHead>
+                      <TableHead className="font-bold text-foreground text-lg p-6">Members</TableHead>
+                      <TableHead className="font-bold text-foreground text-lg p-6">Status</TableHead>
+                      <TableHead className="font-bold text-foreground text-lg p-6">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -637,28 +1171,279 @@ export const RosterScheduler = () => {
                           {format(new Date(assignment.date), "EEEE, MMMM do, yyyy")}
                         </TableCell>
                         <TableCell className="p-6">
-                          <div className="flex gap-3">
-                            {assignment.members.map((memberName, memberIndex) => (
+                          <div className="grid [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))] gap-3">
+                            {assignment.assignments ? assignment.assignments.map((taskAssignment, memberIndex) => (
                               <div
                                 key={memberIndex}
-                                className="inline-flex items-center gap-3 px-6 py-3 rounded-2xl font-bold shadow-lg hover:shadow-glow transition-all duration-300"
+                                className={cn(
+                                  "inline-flex items-center gap-3 px-4 py-3 rounded-2xl font-semibold shadow-sm hover:shadow-md transition-all duration-300 w-full",
+                                  taskAssignment.isCompleted && "opacity-75"
+                                )}
+                                style={{ backgroundColor: memberNameToColor[taskAssignment.memberName] || 'hsl(var(--primary))' }}
+                              >
+                                <Avatar className="h-8 w-8 ring-2 ring-white/30" style={{ boxShadow: `0 0 0 2px ${memberNameToColor[taskAssignment.memberName]}33` }}>
+                                  <AvatarImage alt={taskAssignment.memberName} src={avatarUrlForName(taskAssignment.memberName)} />
+                                  <AvatarFallback className="text-sm font-bold" style={{ color: getTextColorForBg(memberNameToColor[taskAssignment.memberName]) }}>
+                                    {taskAssignment.memberName.slice(0,2).toUpperCase()}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <span className="text-white truncate">{taskAssignment.memberName}</span>
+                                {taskAssignment.isCompleted && (
+                                  <CheckSquare className="h-5 w-5 text-white ml-auto" />
+                                )}
+                              </div>
+                            )) : assignment.members.map((memberName, memberIndex) => (
+                              <div
+                                key={memberIndex}
+                                className="inline-flex items-center gap-3 px-4 py-3 rounded-2xl font-semibold shadow-sm hover:shadow-md transition-all duration-300 w-full"
                                 style={{ backgroundColor: memberNameToColor[memberName] || 'hsl(var(--primary))' }}
                               >
-                                <div className="w-3 h-3 bg-white rounded-full animate-pulse" />
-                                <span className="text-white">{memberName}</span>
+                                <Avatar className="h-8 w-8 ring-2 ring-white/30" style={{ boxShadow: `0 0 0 2px ${memberNameToColor[memberName]}33` }}>
+                                  <AvatarImage alt={memberName} src={avatarUrlForName(memberName)} />
+                                  <AvatarFallback className="text-sm font-bold" style={{ color: getTextColorForBg(memberNameToColor[memberName]) }}>
+                                    {memberName.slice(0,2).toUpperCase()}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <span className="text-white truncate">{memberName}</span>
                               </div>
                             ))}
                           </div>
                         </TableCell>
+                                                 <TableCell className="p-6">
+                           <div className="grid [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))] gap-3">
+                             {assignment.assignments ? assignment.assignments.map((taskAssignment, memberIndex) => (
+                               <div key={memberIndex} className="flex items-center gap-2">
+                                 {taskAssignment.isCompleted ? (
+                                   <div className="flex items-center gap-2 text-success">
+                                     <CheckSquare className="h-4 w-4" />
+                                     <span className="text-sm font-medium">Completed</span>
+                                   </div>
+                                 ) : taskAssignment.swapStatus === 'pending' ? (
+                                   <div className="flex items-center gap-2 text-warning">
+                                     <ArrowRightLeft className="h-4 w-4" />
+                                     <span className="text-sm font-medium">Swap Pending</span>
+                                   </div>
+                                 ) : (
+                                   <div className="flex items-center gap-2 text-muted-foreground">
+                                     <Square className="h-4 w-4" />
+                                     <span className="text-sm font-medium">Pending</span>
+                                   </div>
+                                 )}
+                               </div>
+                             )) : assignment.members.map((memberName, memberIndex) => (
+                               <div key={memberIndex} className="flex items-center gap-2">
+                                 <div className="flex items-center gap-2 text-muted-foreground">
+                                   <Square className="h-4 w-4" />
+                                   <span className="text-sm font-medium">Pending</span>
+                                 </div>
+                               </div>
+                             ))}
+                           </div>
+                         </TableCell>
+                         <TableCell className="p-6">
+                           <div className="grid [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))] gap-3">
+                             {assignment.assignments ? assignment.assignments.map((taskAssignment, memberIndex) => (
+                               <div key={memberIndex} className="flex items-center gap-2">
+                                 <DropdownMenu>
+                                   <DropdownMenuTrigger asChild>
+                                     <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+                                       <MoreHorizontal className="h-4 w-4" />
+                                     </Button>
+                                   </DropdownMenuTrigger>
+                                   <DropdownMenuContent align="end">
+                                     {!taskAssignment.isCompleted ? (
+                                       <DropdownMenuItem 
+                                         onClick={() => markTaskCompleted(taskAssignment.id, taskAssignment.memberId)}
+                                         className="text-success"
+                                       >
+                                         <CheckSquare className="h-4 w-4 mr-2" />
+                                         Mark Complete
+                                       </DropdownMenuItem>
+                                     ) : (
+                                       <DropdownMenuItem 
+                                         onClick={() => markTaskIncomplete(taskAssignment.id)}
+                                         className="text-warning"
+                                       >
+                                         <Square className="h-4 w-4 mr-2" />
+                                         Mark Incomplete
+                                       </DropdownMenuItem>
+                                     )}
+                                     {taskAssignment.swapStatus === 'pending' && (
+                                       <>
+                                         <DropdownMenuItem 
+                                           onClick={() => respondToSwapRequest(taskAssignment.id, 'accepted')}
+                                           className="text-success"
+                                         >
+                                           <CheckCircle className="h-4 w-4 mr-2" />
+                                           Accept Swap
+                                         </DropdownMenuItem>
+                                         <DropdownMenuItem 
+                                           onClick={() => respondToSwapRequest(taskAssignment.id, 'rejected')}
+                                           className="text-destructive"
+                                         >
+                                           <AlertCircle className="h-4 w-4 mr-2" />
+                                           Reject Swap
+                                         </DropdownMenuItem>
+                                       </>
+                                     )}
+                                     {!taskAssignment.isCompleted && taskAssignment.swapStatus !== 'pending' && (
+                                       <DropdownMenuItem 
+                                         onClick={() => openSwapDialog(
+                                           taskAssignment.id, 
+                                           taskAssignment.memberId, 
+                                           taskAssignment.memberName, 
+                                           assignment.date
+                                         )}
+                                         className={taskAssignment.id && taskAssignment.id !== '' ? "text-primary" : "text-muted-foreground"}
+                                         disabled={!taskAssignment.id || taskAssignment.id === ''}
+                                       >
+                                         <ArrowRightLeft className="h-4 w-4 mr-2" />
+                                         {taskAssignment.id && taskAssignment.id !== '' ? "Request Swap" : "Save First"}
+                                       </DropdownMenuItem>
+                                     )}
+                                   </DropdownMenuContent>
+                                 </DropdownMenu>
+                               </div>
+                             )) : assignment.members.map((memberName, memberIndex) => (
+                               <div key={memberIndex} className="flex items-center gap-2">
+                                 <div className="text-muted-foreground text-sm">No actions available</div>
+                               </div>
+                             ))}
+                           </div>
+                         </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
-              </div>
+                </div>
             </CardContent>
           </Card>
-        )}
+                 )}
+
+                 {/* Task Swap Dialog */}
+         <Dialog open={swapDialogOpen} onOpenChange={setSwapDialogOpen}>
+           <DialogContent className="glass border-2 border-border/30 max-w-lg">
+             <DialogHeader>
+               <DialogTitle className="flex items-center gap-3 text-xl">
+                 <ArrowRightLeft className="h-6 w-6 text-primary" />
+                 Swap Task Assignment
+               </DialogTitle>
+               <DialogDescription className="text-muted-foreground">
+                 Select a different date and member to swap with {selectedAssignmentForSwap?.memberName}.
+               </DialogDescription>
+             </DialogHeader>
+             
+             <div className="space-y-6">
+               {/* Current Assignment */}
+               <div className="p-4 bg-primary/10 rounded-xl border-2 border-primary/20">
+                 <div className="flex items-center gap-3">
+                   <Avatar className="h-8 w-8" style={{ backgroundColor: memberNameToColor[selectedAssignmentForSwap?.memberName || ''] }}>
+                     <AvatarImage src={avatarUrlForName(selectedAssignmentForSwap?.memberName || '')} />
+                     <AvatarFallback className="text-sm font-bold text-white">
+                       {selectedAssignmentForSwap?.memberName?.slice(0,2).toUpperCase()}
+                     </AvatarFallback>
+                   </Avatar>
+                   <div>
+                     <div className="font-semibold">{selectedAssignmentForSwap?.memberName}</div>
+                     <div className="text-sm text-muted-foreground">
+                       Currently assigned to {selectedAssignmentForSwap?.date ? format(new Date(selectedAssignmentForSwap.date), "EEEE, MMMM do, yyyy") : 'this date'}
+                     </div>
+                   </div>
+                 </div>
+               </div>
+
+               {/* Target Date Selection */}
+               <div className="space-y-3">
+                 <Label className="text-sm font-semibold">Select Target Date:</Label>
+                 <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto">
+                   {assignments
+                     .filter(a => a.date !== selectedAssignmentForSwap?.date)
+                     .map((assignment) => (
+                       <button
+                         key={assignment.date}
+                         onClick={() => setSwapTargetDate(assignment.date)}
+                         className={cn(
+                           "p-3 rounded-xl border-2 text-left transition-all duration-300",
+                           swapTargetDate === assignment.date
+                             ? "border-primary bg-primary/10"
+                             : "border-border/30 hover:border-primary/50 hover:bg-primary/5"
+                         )}
+                       >
+                         <div className="font-semibold">{format(new Date(assignment.date), "EEEE, MMMM do, yyyy")}</div>
+                         <div className="text-sm text-muted-foreground">
+                           {assignment.assignments?.map(a => a.memberName).join(", ")}
+                         </div>
+                       </button>
+                     ))}
+                 </div>
+               </div>
+
+               {/* Target Member Selection */}
+               {swapTargetDate && (
+                 <div className="space-y-3">
+                   <Label className="text-sm font-semibold">Select Member to Swap With:</Label>
+                   <div className="grid grid-cols-1 gap-2">
+                     {assignments
+                       .find(a => a.date === swapTargetDate)
+                       ?.assignments?.filter(ta => !ta.isCompleted)
+                       .map((targetAssignment) => (
+                         <button
+                           key={targetAssignment.memberId}
+                           onClick={() => setSwapTargetMember(targetAssignment.memberName)}
+                           className={cn(
+                             "p-3 rounded-xl border-2 text-left transition-all duration-300",
+                             swapTargetMember === targetAssignment.memberName
+                               ? "border-primary bg-primary/10"
+                               : "border-border/30 hover:border-primary/50 hover:bg-primary/5"
+                           )}
+                         >
+                           <div className="flex items-center gap-3">
+                             <Avatar className="h-6 w-6" style={{ backgroundColor: memberNameToColor[targetAssignment.memberName] }}>
+                               <AvatarImage src={avatarUrlForName(targetAssignment.memberName)} />
+                               <AvatarFallback className="text-xs font-bold text-white">
+                                 {targetAssignment.memberName.slice(0,2).toUpperCase()}
+                               </AvatarFallback>
+                             </Avatar>
+                             <div>
+                               <div className="font-semibold">{targetAssignment.memberName}</div>
+                               <div className="text-sm text-muted-foreground">
+                                 Assigned to {format(new Date(swapTargetDate), "EEEE, MMMM do, yyyy")}
+                               </div>
+                             </div>
+                           </div>
+                         </button>
+                       ))}
+                   </div>
+                 </div>
+               )}
+
+               {/* Action Buttons */}
+               <div className="flex gap-3 pt-4">
+                 <Button
+                   variant="outline"
+                   onClick={() => {
+                     setSwapDialogOpen(false);
+                     setSelectedAssignmentForSwap(null);
+                     setSwapTargetDate("");
+                     setSwapTargetMember("");
+                   }}
+                   className="flex-1"
+                 >
+                   Cancel
+                 </Button>
+                 <Button
+                   onClick={executeSwap}
+                   disabled={!swapTargetDate || !swapTargetMember}
+                   className="flex-1 btn-gradient"
+                 >
+                   <ArrowRightLeft className="h-4 w-4 mr-2" />
+                   Execute Swap
+                 </Button>
+               </div>
+             </div>
+           </DialogContent>
+         </Dialog>
       </div>
     </div>
   );
-};
+ };
