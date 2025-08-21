@@ -1221,85 +1221,102 @@ export const RosterScheduler = () => {
                            {format(new Date(assignment.date), "EEEE, MMMM do, yyyy")}
                          </TableCell>
                           <TableCell className="p-3 sm:p-6">
-                             <div className="space-y-3">
-                               {assignment.assignments ? assignment.assignments
-                                 .filter(taskAssignment => taskAssignment.isCompleted) // Only show completed tasks
-                                 .map((taskAssignment, memberIndex) => {
-                                   // Check if this task was swapped (has swapped_with and accepted status)
-                                   const wasSwapped = taskAssignment.swappedWith && taskAssignment.swapStatus === 'accepted';
-                                   
-                                   return (
-                                     <div key={memberIndex} className="space-y-2">
-                                       {/* First line: Member name and avatar with completion status */}
-                                       <div className="flex items-center justify-between gap-3 p-3 rounded-xl shadow-sm hover:shadow-md transition-all duration-300" style={{ backgroundColor: memberNameToColor[taskAssignment.memberName] || 'hsl(var(--primary))' }}>
-                                         <div className="flex items-center gap-3">
-                                           <Avatar className="h-8 w-8 ring-2 ring-white/30" style={{ boxShadow: `0 0 0 2px ${memberNameToColor[taskAssignment.memberName]}33` }}>
-                                             <AvatarImage alt={taskAssignment.memberName} src={avatarUrlForName(taskAssignment.memberName)} />
-                                             <AvatarFallback className="text-sm font-bold" style={{ color: getTextColorForBg(memberNameToColor[taskAssignment.memberName]) }}>
-                                               {taskAssignment.memberName.slice(0,2).toUpperCase()}
-                                             </AvatarFallback>
-                                           </Avatar>
-                                           <span className="text-white font-semibold truncate">{taskAssignment.memberName}</span>
-                                         </div>
-                                         <CheckSquare className="h-5 w-5 text-white flex-shrink-0" />
-                                       </div>
-                                       {/* Second line: Completion info and swap indicator */}
-                                       <div className="flex items-center gap-2 px-3 py-2 bg-success/20 rounded-lg text-xs">
-                                         <div className="flex items-center gap-2 text-success">
-                                           <CheckCircle className="h-3 w-3" />
-                                           <span className="font-medium">Task completed</span>
-                                           {taskAssignment.completedAt && (
-                                             <span className="text-muted-foreground">
-                                               • {format(new Date(taskAssignment.completedAt), "MMM d, h:mm a")}
-                                             </span>
-                                           )}
-                                         </div>
-                                       </div>
-                                       {/* Third line: Swap indicator if task was swapped */}
-                                       {wasSwapped && (
-                                         <div className="flex items-center gap-2 px-3 py-2 bg-primary/10 rounded-lg text-xs border border-primary/20">
-                                           <ArrowRightLeft className="h-3 w-3 text-primary" />
-                                           <span className="text-primary font-medium">
-                                             Task swapped from another date
-                                           </span>
-                                           {taskAssignment.swapRequestedAt && (
-                                             <span className="text-muted-foreground">
-                                               • {format(new Date(taskAssignment.swapRequestedAt), "MMM d")}
-                                             </span>
-                                           )}
-                                         </div>
-                                       )}
-                                     </div>
-                                   );
-                                 }) : assignment.members.map((memberName, memberIndex) => (
-                                 <div key={memberIndex} className="space-y-2">
-                                   {/* First line: Member name and avatar */}
-                                   <div className="flex items-center gap-3 p-3 rounded-xl shadow-sm hover:shadow-md transition-all duration-300" style={{ backgroundColor: memberNameToColor[memberName] || 'hsl(var(--primary))' }}>
-                                     <Avatar className="h-8 w-8 ring-2 ring-white/30" style={{ boxShadow: `0 0 0 2px ${memberNameToColor[memberName]}33` }}>
-                                       <AvatarImage alt={memberName} src={avatarUrlForName(memberName)} />
-                                       <AvatarFallback className="text-sm font-bold" style={{ color: getTextColorForBg(memberNameToColor[memberName]) }}>
-                                         {memberName.slice(0,2).toUpperCase()}
-                                       </AvatarFallback>
-                                     </Avatar>
-                                     <span className="text-white font-semibold truncate">{memberName}</span>
-                                   </div>
-                                   {/* Second line: Status information */}
-                                   <div className="flex items-center gap-2 px-3 py-2 bg-secondary/30 rounded-lg text-xs">
-                                     <div className="flex items-center gap-2 text-muted-foreground">
-                                       <Square className="h-3 w-3" />
-                                       <span className="font-medium">Task is pending completion</span>
-                                     </div>
-                                   </div>
-                                 </div>
-                               ))}
-                               {/* Show message if no completed tasks */}
-                               {assignment.assignments && assignment.assignments.filter(ta => ta.isCompleted).length === 0 && (
-                                 <div className="text-center p-4 text-muted-foreground bg-secondary/20 rounded-xl">
-                                   <Square className="h-4 w-4 mx-auto mb-2" />
-                                   <span className="text-sm">No completed tasks yet</span>
-                                 </div>
-                               )}
-                             </div>
+                              <div className="space-y-3">
+                                {assignment.assignments ? assignment.assignments.map((taskAssignment, memberIndex) => {
+                                  // Check if this task was swapped (has swapped_with and accepted status)
+                                  const wasSwapped = taskAssignment.swappedWith && taskAssignment.swapStatus === 'accepted';
+                                  
+                                  return (
+                                    <div key={memberIndex} className="space-y-2">
+                                      {/* First line: Member name and avatar with completion status */}
+                                      <div className={cn(
+                                        "flex items-center justify-between gap-3 p-3 rounded-xl shadow-sm hover:shadow-md transition-all duration-300",
+                                        taskAssignment.isCompleted ? "" : "opacity-60"
+                                      )} style={{ backgroundColor: memberNameToColor[taskAssignment.memberName] || 'hsl(var(--primary))' }}>
+                                        <div className="flex items-center gap-3">
+                                          <Avatar className="h-8 w-8 ring-2 ring-white/30" style={{ boxShadow: `0 0 0 2px ${memberNameToColor[taskAssignment.memberName]}33` }}>
+                                            <AvatarImage alt={taskAssignment.memberName} src={avatarUrlForName(taskAssignment.memberName)} />
+                                            <AvatarFallback className="text-sm font-bold" style={{ color: getTextColorForBg(memberNameToColor[taskAssignment.memberName]) }}>
+                                              {taskAssignment.memberName.slice(0,2).toUpperCase()}
+                                            </AvatarFallback>
+                                          </Avatar>
+                                          <span className="text-white font-semibold truncate">{taskAssignment.memberName}</span>
+                                        </div>
+                                        {taskAssignment.isCompleted ? (
+                                          <CheckSquare className="h-5 w-5 text-white flex-shrink-0" />
+                                        ) : (
+                                          <Square className="h-5 w-5 text-white/70 flex-shrink-0" />
+                                        )}
+                                      </div>
+                                      
+                                      {/* Second line: Status information */}
+                                      {taskAssignment.isCompleted ? (
+                                        <div className="flex items-center gap-2 px-3 py-2 bg-success/20 rounded-lg text-xs">
+                                          <div className="flex items-center gap-2 text-success">
+                                            <CheckCircle className="h-3 w-3" />
+                                            <span className="font-medium">Task completed</span>
+                                            {taskAssignment.completedAt && (
+                                              <span className="text-muted-foreground">
+                                                • {format(new Date(taskAssignment.completedAt), "MMM d, h:mm a")}
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <div className="flex items-center gap-2 px-3 py-2 bg-secondary/30 rounded-lg text-xs">
+                                          {taskAssignment.swapStatus === 'pending' ? (
+                                            <div className="flex items-center gap-2 text-warning">
+                                              <ArrowRightLeft className="h-3 w-3" />
+                                              <span className="font-medium">Swap request pending</span>
+                                            </div>
+                                          ) : (
+                                            <div className="flex items-center gap-2 text-muted-foreground">
+                                              <Square className="h-3 w-3" />
+                                              <span className="font-medium">Task pending completion</span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+                                      
+                                      {/* Third line: Swap indicator if task was swapped */}
+                                      {wasSwapped && (
+                                        <div className="flex items-center gap-2 px-3 py-2 bg-primary/10 rounded-lg text-xs border border-primary/20">
+                                          <ArrowRightLeft className="h-3 w-3 text-primary" />
+                                          <span className="text-primary font-medium">
+                                            Task swapped from another date
+                                          </span>
+                                          {taskAssignment.swapRequestedAt && (
+                                            <span className="text-muted-foreground">
+                                              • {format(new Date(taskAssignment.swapRequestedAt), "MMM d")}
+                                            </span>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                }) : assignment.members.map((memberName, memberIndex) => (
+                                  <div key={memberIndex} className="space-y-2">
+                                    {/* First line: Member name and avatar */}
+                                    <div className="flex items-center gap-3 p-3 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 opacity-60" style={{ backgroundColor: memberNameToColor[memberName] || 'hsl(var(--primary))' }}>
+                                      <Avatar className="h-8 w-8 ring-2 ring-white/30" style={{ boxShadow: `0 0 0 2px ${memberNameToColor[memberName]}33` }}>
+                                        <AvatarImage alt={memberName} src={avatarUrlForName(memberName)} />
+                                        <AvatarFallback className="text-sm font-bold" style={{ color: getTextColorForBg(memberNameToColor[memberName]) }}>
+                                          {memberName.slice(0,2).toUpperCase()}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      <span className="text-white font-semibold truncate">{memberName}</span>
+                                      <Square className="h-5 w-5 text-white/70 flex-shrink-0 ml-auto" />
+                                    </div>
+                                    {/* Second line: Status information */}
+                                    <div className="flex items-center gap-2 px-3 py-2 bg-secondary/30 rounded-lg text-xs">
+                                      <div className="flex items-center gap-2 text-muted-foreground">
+                                        <Square className="h-3 w-3" />
+                                        <span className="font-medium">Task pending completion</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
                            </TableCell>
                           <TableCell className="p-3 sm:p-6">
                             <div className="space-y-3">
