@@ -10,11 +10,13 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Plus, Trash2, Users, Calendar as CalendarDays, Clock, CheckCircle, AlertCircle, Sparkles, Loader2, RefreshCw, Trash, CheckSquare, Square, ArrowRightLeft, MoreHorizontal } from "lucide-react";
+import { CalendarIcon, Plus, Trash2, Users, Calendar as CalendarDays, Clock, CheckCircle, AlertCircle, Sparkles, Loader2, RefreshCw, Trash, CheckSquare, Square, ArrowRightLeft, MoreHorizontal, Download, FileText, Image } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 
 interface Member {
   id: string;
@@ -63,6 +65,7 @@ export const RosterScheduler = () => {
   } | null>(null);
   const [swapTargetDate, setSwapTargetDate] = useState<string>("");
   const [swapTargetMember, setSwapTargetMember] = useState<string>("");
+  const [isExporting, setIsExporting] = useState(false);
   
   const { toast } = useToast();
 
@@ -822,13 +825,388 @@ export const RosterScheduler = () => {
        });
     } catch (error) {
       console.error('Error executing swap:', error);
-      toast({
-        title: "Error",
-        description: "Failed to execute task swap",
-        variant: "destructive"
-      });
-    }
-  };
+              toast({
+          title: "Error",
+          description: "Failed to execute task swap",
+          variant: "destructive"
+        });
+      }
+    };
+
+    // Export functions
+    const exportAsImage = async () => {
+      if (assignments.length === 0) {
+        toast({
+          title: "No Schedule to Export",
+          description: "Please generate a schedule first",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      setIsExporting(true);
+      try {
+        // Create a temporary container for export
+        const tempContainer = document.createElement('div');
+        tempContainer.style.position = 'absolute';
+        tempContainer.style.left = '-9999px';
+        tempContainer.style.top = '0';
+        tempContainer.style.width = '800px';
+        tempContainer.style.backgroundColor = '#ffffff';
+        tempContainer.style.padding = '20px';
+        tempContainer.style.fontFamily = 'Arial, sans-serif';
+        tempContainer.style.color = '#000000';
+        
+        // Add title
+        const title = document.createElement('h1');
+        title.textContent = 'House Cleaning Schedule';
+        title.style.fontSize = '24px';
+        title.style.fontWeight = 'bold';
+        title.style.textAlign = 'center';
+        title.style.marginBottom = '20px';
+        title.style.color = '#000000';
+        tempContainer.appendChild(title);
+
+        // Add roster info
+        if (rosterName) {
+          const rosterInfo = document.createElement('p');
+          rosterInfo.textContent = `Roster: ${rosterName}`;
+          rosterInfo.style.fontSize = '16px';
+          rosterInfo.style.textAlign = 'center';
+          rosterInfo.style.marginBottom = '10px';
+          rosterInfo.style.color = '#666666';
+          tempContainer.appendChild(rosterInfo);
+        }
+
+        // Add date range
+        if (startDate && endDate) {
+          const dateInfo = document.createElement('p');
+          dateInfo.textContent = `Period: ${format(startDate, 'PPP')} - ${format(endDate, 'PPP')}`;
+          dateInfo.style.fontSize = '14px';
+          dateInfo.style.textAlign = 'center';
+          dateInfo.style.marginBottom = '20px';
+          dateInfo.style.color = '#666666';
+          tempContainer.appendChild(dateInfo);
+        }
+
+        // Add member counts
+        const countsTitle = document.createElement('h2');
+        countsTitle.textContent = 'Assignment Counts';
+        countsTitle.style.fontSize = '18px';
+        countsTitle.style.fontWeight = 'bold';
+        countsTitle.style.marginBottom = '10px';
+        countsTitle.style.color = '#000000';
+        tempContainer.appendChild(countsTitle);
+
+        const countsContainer = document.createElement('div');
+        countsContainer.style.display = 'grid';
+        countsContainer.style.gridTemplateColumns = 'repeat(auto-fit, minmax(200px, 1fr))';
+        countsContainer.style.gap = '10px';
+        countsContainer.style.marginBottom = '20px';
+
+        Object.entries(assignedCounts).forEach(([name, count]) => {
+          const countItem = document.createElement('div');
+          countItem.style.padding = '10px';
+          countItem.style.border = '1px solid #ddd';
+          countItem.style.borderRadius = '5px';
+          countItem.style.backgroundColor = '#f9f9f9';
+          countItem.innerHTML = `<strong>${name}</strong>: ${count} assignment${count === 1 ? '' : 's'}`;
+          countsContainer.appendChild(countItem);
+        });
+        tempContainer.appendChild(countsContainer);
+
+        // Add schedule table
+        const scheduleTitle = document.createElement('h2');
+        scheduleTitle.textContent = 'Weekly Schedule';
+        scheduleTitle.style.fontSize = '18px';
+        scheduleTitle.style.fontWeight = 'bold';
+        scheduleTitle.style.marginBottom = '10px';
+        scheduleTitle.style.color = '#000000';
+        tempContainer.appendChild(scheduleTitle);
+
+        const table = document.createElement('table');
+        table.style.width = '100%';
+        table.style.borderCollapse = 'collapse';
+        table.style.marginBottom = '20px';
+
+        // Table header
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+        headerRow.style.backgroundColor = '#f0f0f0';
+        
+        const dateHeader = document.createElement('th');
+        dateHeader.textContent = 'Date';
+        dateHeader.style.padding = '12px';
+        dateHeader.style.border = '1px solid #ddd';
+        dateHeader.style.textAlign = 'left';
+        dateHeader.style.fontWeight = 'bold';
+        
+        const membersHeader = document.createElement('th');
+        membersHeader.textContent = 'Assigned Members';
+        membersHeader.style.padding = '12px';
+        membersHeader.style.border = '1px solid #ddd';
+        membersHeader.style.textAlign = 'left';
+        membersHeader.style.fontWeight = 'bold';
+        
+        const statusHeader = document.createElement('th');
+        statusHeader.textContent = 'Status';
+        statusHeader.style.padding = '12px';
+        statusHeader.style.border = '1px solid #ddd';
+        statusHeader.style.textAlign = 'left';
+        statusHeader.style.fontWeight = 'bold';
+
+        headerRow.appendChild(dateHeader);
+        headerRow.appendChild(membersHeader);
+        headerRow.appendChild(statusHeader);
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+
+        // Table body
+        const tbody = document.createElement('tbody');
+        assignments.forEach((assignment) => {
+          const row = document.createElement('tr');
+          
+          const dateCell = document.createElement('td');
+          dateCell.textContent = format(new Date(assignment.date), "EEEE, MMMM do, yyyy");
+          dateCell.style.padding = '12px';
+          dateCell.style.border = '1px solid #ddd';
+          
+          const membersCell = document.createElement('td');
+          if (assignment.assignments) {
+            const memberNames = assignment.assignments.map(a => a.memberName).join(', ');
+            membersCell.textContent = memberNames;
+          } else {
+            membersCell.textContent = assignment.members.join(', ');
+          }
+          membersCell.style.padding = '12px';
+          membersCell.style.border = '1px solid #ddd';
+          
+          const statusCell = document.createElement('td');
+          if (assignment.assignments) {
+            const completedCount = assignment.assignments.filter(a => a.isCompleted).length;
+            const totalCount = assignment.assignments.length;
+            statusCell.textContent = `${completedCount}/${totalCount} completed`;
+            statusCell.style.color = completedCount === totalCount ? '#22c55e' : '#f59e0b';
+          } else {
+            statusCell.textContent = 'Not started';
+            statusCell.style.color = '#6b7280';
+          }
+          statusCell.style.padding = '12px';
+          statusCell.style.border = '1px solid #ddd';
+          statusCell.style.fontWeight = 'bold';
+
+          row.appendChild(dateCell);
+          row.appendChild(membersCell);
+          row.appendChild(statusCell);
+          tbody.appendChild(row);
+        });
+        table.appendChild(tbody);
+        tempContainer.appendChild(table);
+
+        // Add to document temporarily
+        document.body.appendChild(tempContainer);
+
+        // Wait a bit for rendering
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Capture with html2canvas
+        const canvas = await html2canvas(tempContainer, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: '#ffffff',
+          width: tempContainer.offsetWidth,
+          height: tempContainer.offsetHeight,
+          logging: false,
+          imageTimeout: 15000
+        });
+
+        // Remove temporary container
+        document.body.removeChild(tempContainer);
+
+        // Convert canvas to blob
+        canvas.toBlob((blob) => {
+          if (blob) {
+            // Create download link
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `${rosterName || 'cleaning-schedule'}-${format(new Date(), 'yyyy-MM-dd')}.png`;
+            
+            // Trigger download
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            // Clean up
+            URL.revokeObjectURL(url);
+            
+            toast({
+              title: "Image Exported! 📸",
+              description: "Schedule has been exported as an image",
+            });
+          }
+        }, 'image/png', 0.95);
+
+      } catch (error) {
+        console.error('Error exporting as image:', error);
+        toast({
+          title: "Export Failed",
+          description: "Failed to export schedule as image. Please try again.",
+          variant: "destructive"
+        });
+      } finally {
+        setIsExporting(false);
+      }
+    };
+
+    const exportAsPDF = async () => {
+      if (assignments.length === 0) {
+        toast({
+          title: "No Schedule to Export",
+          description: "Please generate a schedule first",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      setIsExporting(true);
+      try {
+        // Create PDF
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        let yPosition = 20;
+        const pageWidth = 210;
+        const margin = 20;
+        const contentWidth = pageWidth - (2 * margin);
+
+        // Add title
+        pdf.setFontSize(24);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('House Cleaning Schedule', pageWidth / 2, yPosition, { align: 'center' });
+        yPosition += 15;
+
+        // Add roster info
+        if (rosterName) {
+          pdf.setFontSize(14);
+          pdf.setFont('helvetica', 'normal');
+          pdf.text(`Roster: ${rosterName}`, pageWidth / 2, yPosition, { align: 'center' });
+          yPosition += 10;
+        }
+
+        // Add date range
+        if (startDate && endDate) {
+          pdf.setFontSize(12);
+          pdf.text(`Period: ${format(startDate, 'PPP')} - ${format(endDate, 'PPP')}`, pageWidth / 2, yPosition, { align: 'center' });
+          yPosition += 15;
+        }
+
+        // Add generation date
+        pdf.setFontSize(10);
+        pdf.text(`Generated on: ${format(new Date(), 'PPP')}`, pageWidth / 2, yPosition, { align: 'center' });
+        yPosition += 20;
+
+        // Add member counts section
+        pdf.setFontSize(16);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('Assignment Counts', margin, yPosition);
+        yPosition += 10;
+
+        pdf.setFontSize(10);
+        pdf.setFont('helvetica', 'normal');
+        Object.entries(assignedCounts).forEach(([name, count]) => {
+          const text = `${name}: ${count} assignment${count === 1 ? '' : 's'}`;
+          pdf.text(text, margin + 5, yPosition);
+          yPosition += 6;
+        });
+
+        yPosition += 10;
+
+        // Check if we need a new page
+        if (yPosition > 250) {
+          pdf.addPage();
+          yPosition = 20;
+        }
+
+        // Add schedule table
+        pdf.setFontSize(16);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('Weekly Schedule', margin, yPosition);
+        yPosition += 10;
+
+        // Table headers
+        pdf.setFontSize(10);
+        pdf.setFont('helvetica', 'bold');
+        const colWidths = [50, 80, 30];
+        const colX = [margin, margin + 50, margin + 130];
+        
+        pdf.text('Date', colX[0], yPosition);
+        pdf.text('Members', colX[1], yPosition);
+        pdf.text('Status', colX[2], yPosition);
+        yPosition += 8;
+
+        // Draw header line
+        pdf.line(margin, yPosition, pageWidth - margin, yPosition);
+        yPosition += 5;
+
+        // Table content
+        pdf.setFont('helvetica', 'normal');
+        assignments.forEach((assignment) => {
+          // Check if we need a new page
+          if (yPosition > 270) {
+            pdf.addPage();
+            yPosition = 20;
+          }
+
+          const dateText = format(new Date(assignment.date), "MMM do");
+          let membersText = '';
+          let statusText = '';
+
+          if (assignment.assignments) {
+            membersText = assignment.assignments.map(a => a.memberName).join(', ');
+            const completedCount = assignment.assignments.filter(a => a.isCompleted).length;
+            const totalCount = assignment.assignments.length;
+            statusText = `${completedCount}/${totalCount}`;
+          } else {
+            membersText = assignment.members.join(', ');
+            statusText = '0/2';
+          }
+
+          // Wrap text if needed
+          const wrappedMembers = pdf.splitTextToSize(membersText, colWidths[1] - 5);
+          
+          pdf.text(dateText, colX[0], yPosition);
+          pdf.text(wrappedMembers, colX[1], yPosition);
+          pdf.text(statusText, colX[2], yPosition);
+
+          // Calculate height for this row
+          const rowHeight = Math.max(6, wrappedMembers.length * 4);
+          yPosition += rowHeight + 2;
+
+          // Draw row line
+          pdf.line(margin, yPosition, pageWidth - margin, yPosition);
+          yPosition += 3;
+        });
+
+        // Save PDF
+        const fileName = `${rosterName || 'cleaning-schedule'}-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+        pdf.save(fileName);
+
+        toast({
+          title: "PDF Exported! 📄",
+          description: "Schedule has been exported as a PDF",
+        });
+
+      } catch (error) {
+        console.error('Error exporting as PDF:', error);
+        toast({
+          title: "Export Failed",
+          description: "Failed to export schedule as PDF. Please try again.",
+          variant: "destructive"
+        });
+      } finally {
+        setIsExporting(false);
+      }
+    };
 
   const weeksNeeded = calculateWeeksNeeded();
   const selectedWeeks = calculateSelectedWeeks();
@@ -904,19 +1282,25 @@ export const RosterScheduler = () => {
                     <strong>Tip:</strong> The app automatically assigns 2 people per week and ensures no one works consecutive weeks for fair distribution.
                   </p>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="p-4 bg-accent/5 rounded-xl border border-accent/20">
                     <h4 className="font-semibold text-foreground mb-2">Loading Saved Schedules</h4>
                     <p className="text-sm text-muted-foreground">
                       Click "Load" next to any saved roster in the "Saved Rosters" section to restore your previous schedule with all assignments and completion status.
                     </p>
                   </div>
-                  <div className="p-4 bg-success/5 rounded-xl border border-success/20">
-                    <h4 className="font-semibold text-foreground mb-2">Managing Tasks</h4>
-                    <p className="text-sm text-muted-foreground">
-                      Use the three-dot menu in the Actions column to mark tasks complete, reopen completed tasks, or request swaps with other members on different dates.
-                    </p>
-                  </div>
+                                     <div className="p-4 bg-success/5 rounded-xl border border-success/20">
+                     <h4 className="font-semibold text-foreground mb-2">Managing Tasks</h4>
+                     <p className="text-sm text-muted-foreground">
+                       Use the three-dot menu in the Actions column to mark tasks complete, reopen completed tasks, or request swaps with other members on different dates.
+                     </p>
+                   </div>
+                   <div className="p-4 bg-warning/5 rounded-xl border border-warning/20">
+                     <h4 className="font-semibold text-foreground mb-2">Exporting Schedules</h4>
+                     <p className="text-sm text-muted-foreground">
+                       Use the export buttons to save your schedule as an image or PDF. Works on all devices including mobile phones and tablets.
+                     </p>
+                   </div>
                 </div>
               </div>
             </div>
@@ -1222,23 +1606,56 @@ export const RosterScheduler = () => {
           </div>
         </div>
 
-        {/* Generated Schedule */}
-        {assignments.length > 0 && (
-          <Card className="card-modern animate-fade-in mt-12">
-            <CardHeader className="pb-6">
-              <CardTitle className="flex items-center gap-4 text-2xl">
-                <div className="p-3 bg-gradient-primary rounded-2xl">
-                  <CheckCircle className="h-6 w-6 text-primary-foreground" />
-                </div>
-                Generated Schedule
-                <Badge className="ml-auto bg-gradient-accent text-accent-foreground font-bold px-4 py-2 rounded-xl">
-                  {assignments.length} weeks
-                </Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {/* Assigned counts summary */}
-              <div className="glass p-4 rounded-xl border-2 border-border/20 mb-6">
+                 {/* Generated Schedule */}
+         {assignments.length > 0 && (
+           <Card className="card-modern animate-fade-in mt-12">
+             <CardHeader className="pb-6">
+               <CardTitle className="flex items-center gap-4 text-2xl">
+                 <div className="p-3 bg-gradient-primary rounded-2xl">
+                   <CheckCircle className="h-6 w-6 text-primary-foreground" />
+                 </div>
+                 Generated Schedule
+                 <Badge className="ml-auto bg-gradient-accent text-accent-foreground font-bold px-4 py-2 rounded-xl">
+                   {assignments.length} weeks
+                 </Badge>
+               </CardTitle>
+               {/* Export buttons */}
+               <div className="flex flex-wrap gap-3 mt-4">
+                 <Button
+                   onClick={exportAsImage}
+                   disabled={isExporting}
+                   variant="outline"
+                   size="sm"
+                   className="rounded-xl border-2 border-primary/30 hover:bg-primary hover:text-primary-foreground"
+                 >
+                   {isExporting ? (
+                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                   ) : (
+                     <Image className="h-4 w-4 mr-2" />
+                   )}
+                   Export as Image
+                 </Button>
+                 <Button
+                   onClick={exportAsPDF}
+                   disabled={isExporting}
+                   variant="outline"
+                   size="sm"
+                   className="rounded-xl border-2 border-primary/30 hover:bg-primary hover:text-primary-foreground"
+                 >
+                   {isExporting ? (
+                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                   ) : (
+                     <FileText className="h-4 w-4 mr-2" />
+                   )}
+                   Export as PDF
+                 </Button>
+               </div>
+             </CardHeader>
+                         <CardContent>
+               {/* Export container */}
+               <div id="schedule-export">
+                 {/* Assigned counts summary */}
+                 <div className="glass p-4 rounded-xl border-2 border-border/20 mb-6">
                 <div className="text-sm font-semibold text-muted-foreground mb-3">Counts</div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                   {Object.keys(assignedCounts).length > 0 ? (
@@ -1490,10 +1907,11 @@ export const RosterScheduler = () => {
                        </TableRow>
                     ))}
                   </TableBody>
-                </Table>
-                </div>
-            </CardContent>
-          </Card>
+                                 </Table>
+                 </div>
+               </div>
+             </CardContent>
+           </Card>
                  )}
 
                  {/* Task Swap Dialog */}
