@@ -1327,11 +1327,11 @@ export const RosterScheduler = () => {
                                      </div>
                                                                            <div className="flex items-center gap-2">
                                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                          <span>Available actions for {taskAssignment.memberName}:</span>
                                           {taskAssignment.isCompleted ? (
                                             <span className="text-success font-medium">Completed</span>
                                           ) : (
                                             <>
+                                              <span>Available actions for {taskAssignment.memberName}:</span>
                                               <span className="text-success font-medium">Complete Task</span>
                                               {taskAssignment.swapStatus !== 'pending' && (
                                                 <span className="text-primary font-medium">• Request Swap</span>
@@ -1346,23 +1346,23 @@ export const RosterScheduler = () => {
                                            </Button>
                                          </DropdownMenuTrigger>
                                          <DropdownMenuContent align="end" className="min-w-[180px]">
-                                           {!taskAssignment.isCompleted ? (
-                                             <DropdownMenuItem 
-                                               onClick={() => markTaskCompleted(taskAssignment.id, taskAssignment.memberId)}
-                                               className="text-success cursor-pointer"
-                                             >
-                                               <CheckSquare className="h-4 w-4 mr-2" />
-                                               Mark Complete
-                                             </DropdownMenuItem>
-                                           ) : (
-                                             <DropdownMenuItem 
-                                               onClick={() => markTaskIncomplete(taskAssignment.id)}
-                                               className="text-warning cursor-pointer"
-                                             >
-                                               <Square className="h-4 w-4 mr-2" />
-                                               Mark Incomplete
-                                             </DropdownMenuItem>
-                                           )}
+                                                                                       {!taskAssignment.isCompleted ? (
+                                              <DropdownMenuItem 
+                                                onClick={() => markTaskCompleted(taskAssignment.id, taskAssignment.memberId)}
+                                                className="text-success cursor-pointer"
+                                              >
+                                                <CheckSquare className="h-4 w-4 mr-2" />
+                                                Mark Complete
+                                              </DropdownMenuItem>
+                                            ) : (
+                                              <DropdownMenuItem 
+                                                onClick={() => markTaskIncomplete(taskAssignment.id)}
+                                                className="text-warning cursor-pointer"
+                                              >
+                                                <Square className="h-4 w-4 mr-2" />
+                                                Mark as Incomplete
+                                              </DropdownMenuItem>
+                                            )}
                                            {taskAssignment.swapStatus === 'pending' && (
                                              <>
                                                <DropdownMenuItem 
