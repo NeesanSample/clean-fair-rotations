@@ -1243,40 +1243,23 @@ export const RosterScheduler = () => {
                                           <span className="text-white font-semibold truncate">{taskAssignment.memberName}</span>
                                         </div>
                                         {taskAssignment.isCompleted ? (
-                                          <CheckSquare className="h-5 w-5 text-white flex-shrink-0" />
+                                          <div className="flex items-center justify-center w-6 h-6 bg-white/20 rounded-full">
+                                            <CheckSquare className="h-4 w-4 text-white flex-shrink-0" />
+                                          </div>
                                         ) : (
                                           <Square className="h-5 w-5 text-white/70 flex-shrink-0" />
                                         )}
                                       </div>
                                       
-                                      {/* Second line: Status information */}
-                                      {taskAssignment.isCompleted ? (
-                                        <div className="flex items-center gap-2 px-3 py-2 bg-success/20 rounded-lg text-xs">
-                                          <div className="flex items-center gap-2 text-success">
-                                            <CheckCircle className="h-3 w-3" />
-                                            <span className="font-medium">Task completed</span>
-                                            {taskAssignment.completedAt && (
-                                              <span className="text-muted-foreground">
-                                                • {format(new Date(taskAssignment.completedAt), "MMM d, h:mm a")}
-                                              </span>
-                                            )}
-                                          </div>
-                                        </div>
-                                      ) : (
-                                        <div className="flex items-center gap-2 px-3 py-2 bg-secondary/30 rounded-lg text-xs">
-                                          {taskAssignment.swapStatus === 'pending' ? (
-                                            <div className="flex items-center gap-2 text-warning">
-                                              <ArrowRightLeft className="h-3 w-3" />
-                                              <span className="font-medium">Swap request pending</span>
-                                            </div>
-                                          ) : (
-                                            <div className="flex items-center gap-2 text-muted-foreground">
-                                              <Square className="h-3 w-3" />
-                                              <span className="font-medium">Task pending completion</span>
-                                            </div>
-                                          )}
-                                        </div>
-                                      )}
+                                                                             {/* Second line: Status information - only show for swap requests */}
+                                       {taskAssignment.swapStatus === 'pending' && (
+                                         <div className="flex items-center gap-2 px-3 py-2 bg-secondary/30 rounded-lg text-xs">
+                                           <div className="flex items-center gap-2 text-warning">
+                                             <ArrowRightLeft className="h-3 w-3" />
+                                             <span className="font-medium">Swap request pending</span>
+                                           </div>
+                                         </div>
+                                       )}
                                       
                                       {/* Third line: Swap indicator if task was swapped */}
                                       {wasSwapped && (
@@ -1307,13 +1290,15 @@ export const RosterScheduler = () => {
                                       <span className="text-white font-semibold truncate">{memberName}</span>
                                       <Square className="h-5 w-5 text-white/70 flex-shrink-0 ml-auto" />
                                     </div>
-                                    {/* Second line: Status information */}
-                                    <div className="flex items-center gap-2 px-3 py-2 bg-secondary/30 rounded-lg text-xs">
-                                      <div className="flex items-center gap-2 text-muted-foreground">
-                                        <Square className="h-3 w-3" />
-                                        <span className="font-medium">Task pending completion</span>
+                                    {/* Second line: Status information - only show for completed tasks */}
+                                    {false && (
+                                      <div className="flex items-center gap-2 px-3 py-2 bg-secondary/30 rounded-lg text-xs">
+                                        <div className="flex items-center gap-2 text-muted-foreground">
+                                          <Square className="h-3 w-3" />
+                                          <span className="font-medium">Task pending completion</span>
+                                        </div>
                                       </div>
-                                    </div>
+                                    )}
                                   </div>
                                 ))}
                               </div>
@@ -1322,114 +1307,116 @@ export const RosterScheduler = () => {
                             <div className="space-y-3">
                               {assignment.assignments ? assignment.assignments.map((taskAssignment, memberIndex) => (
                                 <div key={memberIndex} className="space-y-2">
-                                  {/* First line: Status indicator and action button */}
-                                  <div className="flex items-center justify-between gap-3 p-3 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 bg-secondary/20">
-                                    <div className="flex items-center gap-2">
-                                      {taskAssignment.isCompleted ? (
-                                        <div className="flex items-center gap-1 text-success">
-                                          <CheckSquare className="h-4 w-4" />
-                                          <span className="text-xs font-medium">Completed</span>
-                                        </div>
-                                      ) : taskAssignment.swapStatus === 'pending' ? (
-                                        <div className="flex items-center gap-1 text-warning">
-                                          <ArrowRightLeft className="h-4 w-4" />
-                                          <span className="text-xs font-medium">Swap Pending</span>
-                                        </div>
-                                      ) : (
-                                        <div className="flex items-center gap-1 text-muted-foreground">
-                                          <Square className="h-4 w-4" />
-                                          <span className="text-xs font-medium">Pending</span>
-                                        </div>
-                                      )}
-                                    </div>
-                                    <DropdownMenu>
-                                      <DropdownMenuTrigger asChild>
-                                        <Button variant="outline" size="sm" className="h-7 w-7 p-0 flex-shrink-0">
-                                          <MoreHorizontal className="h-3 w-3" />
-                                        </Button>
-                                      </DropdownMenuTrigger>
-                                      <DropdownMenuContent align="end" className="min-w-[180px]">
-                                        {!taskAssignment.isCompleted ? (
-                                          <DropdownMenuItem 
-                                            onClick={() => markTaskCompleted(taskAssignment.id, taskAssignment.memberId)}
-                                            className="text-success cursor-pointer"
-                                          >
-                                            <CheckSquare className="h-4 w-4 mr-2" />
-                                            Mark Complete
-                                          </DropdownMenuItem>
-                                        ) : (
-                                          <DropdownMenuItem 
-                                            onClick={() => markTaskIncomplete(taskAssignment.id)}
-                                            className="text-warning cursor-pointer"
-                                          >
-                                            <Square className="h-4 w-4 mr-2" />
-                                            Mark Incomplete
-                                          </DropdownMenuItem>
-                                        )}
-                                        {taskAssignment.swapStatus === 'pending' && (
-                                          <>
-                                            <DropdownMenuItem 
-                                              onClick={() => respondToSwapRequest(taskAssignment.id, 'accepted')}
-                                              className="text-success cursor-pointer"
-                                            >
-                                              <CheckCircle className="h-4 w-4 mr-2" />
-                                              Accept Swap
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem 
-                                              onClick={() => respondToSwapRequest(taskAssignment.id, 'rejected')}
-                                              className="text-destructive cursor-pointer"
-                                            >
-                                              <AlertCircle className="h-4 w-4 mr-2" />
-                                              Reject Swap
-                                            </DropdownMenuItem>
-                                          </>
-                                        )}
-                                        {!taskAssignment.isCompleted && taskAssignment.swapStatus !== 'pending' && (
-                                          <DropdownMenuItem 
-                                            onClick={() => openSwapDialog(
-                                              taskAssignment.id, 
-                                              taskAssignment.memberId, 
-                                              taskAssignment.memberName, 
-                                              assignment.date
-                                            )}
-                                            className={taskAssignment.id && taskAssignment.id !== '' ? "text-primary cursor-pointer" : "text-muted-foreground"}
-                                            disabled={!taskAssignment.id || taskAssignment.id === ''}
-                                          >
-                                            <ArrowRightLeft className="h-4 w-4 mr-2" />
-                                            {taskAssignment.id && taskAssignment.id !== '' ? "Request Swap" : "Save First"}
-                                          </DropdownMenuItem>
-                                        )}
-                                      </DropdownMenuContent>
-                                    </DropdownMenu>
-                                  </div>
-                                                                     {/* Second line: Available actions summary (only for non-completed tasks) */}
-                                   {!taskAssignment.isCompleted && (
-                                     <div className="flex items-center gap-2 px-3 py-2 bg-secondary/30 rounded-lg text-xs">
-                                       <span className="text-muted-foreground">Available actions:</span>
-                                       <span className="text-success font-medium">Complete Task</span>
-                                       {taskAssignment.swapStatus !== 'pending' && (
-                                         <span className="text-primary font-medium">• Request Swap</span>
+                                                                     {/* First line: Status indicator and action button */}
+                                   <div className="flex items-center justify-between gap-3 p-3 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 bg-secondary/20">
+                                     <div className="flex items-center gap-2">
+                                       {taskAssignment.isCompleted ? (
+                                         <div className="flex items-center gap-1 text-success">
+                                           <CheckSquare className="h-5 w-5" />
+                                         </div>
+                                       ) : taskAssignment.swapStatus === 'pending' ? (
+                                         <div className="flex items-center gap-1 text-warning">
+                                           <ArrowRightLeft className="h-4 w-4" />
+                                           <span className="text-xs font-medium">Swap Pending</span>
+                                         </div>
+                                       ) : (
+                                         <div className="flex items-center gap-1 text-muted-foreground">
+                                           <Square className="h-4 w-4" />
+                                         </div>
                                        )}
                                      </div>
-                                   )}
+                                                                           <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                          <span>Available actions for {taskAssignment.memberName}:</span>
+                                          {taskAssignment.isCompleted ? (
+                                            <span className="text-success font-medium">Completed</span>
+                                          ) : (
+                                            <>
+                                              <span className="text-success font-medium">Complete Task</span>
+                                              {taskAssignment.swapStatus !== 'pending' && (
+                                                <span className="text-primary font-medium">• Request Swap</span>
+                                              )}
+                                            </>
+                                          )}
+                                        </div>
+                                       <DropdownMenu>
+                                         <DropdownMenuTrigger asChild>
+                                           <Button variant="outline" size="sm" className="h-7 w-7 p-0 flex-shrink-0">
+                                             <MoreHorizontal className="h-3 w-3" />
+                                           </Button>
+                                         </DropdownMenuTrigger>
+                                         <DropdownMenuContent align="end" className="min-w-[180px]">
+                                           {!taskAssignment.isCompleted ? (
+                                             <DropdownMenuItem 
+                                               onClick={() => markTaskCompleted(taskAssignment.id, taskAssignment.memberId)}
+                                               className="text-success cursor-pointer"
+                                             >
+                                               <CheckSquare className="h-4 w-4 mr-2" />
+                                               Mark Complete
+                                             </DropdownMenuItem>
+                                           ) : (
+                                             <DropdownMenuItem 
+                                               onClick={() => markTaskIncomplete(taskAssignment.id)}
+                                               className="text-warning cursor-pointer"
+                                             >
+                                               <Square className="h-4 w-4 mr-2" />
+                                               Mark Incomplete
+                                             </DropdownMenuItem>
+                                           )}
+                                           {taskAssignment.swapStatus === 'pending' && (
+                                             <>
+                                               <DropdownMenuItem 
+                                                 onClick={() => respondToSwapRequest(taskAssignment.id, 'accepted')}
+                                                 className="text-success cursor-pointer"
+                                               >
+                                                 <CheckCircle className="h-4 w-4 mr-2" />
+                                                 Accept Swap
+                                               </DropdownMenuItem>
+                                               <DropdownMenuItem 
+                                                 onClick={() => respondToSwapRequest(taskAssignment.id, 'rejected')}
+                                                 className="text-destructive cursor-pointer"
+                                               >
+                                                 <AlertCircle className="h-4 w-4 mr-2" />
+                                                 Reject Swap
+                                               </DropdownMenuItem>
+                                             </>
+                                           )}
+                                           {!taskAssignment.isCompleted && taskAssignment.swapStatus !== 'pending' && (
+                                             <DropdownMenuItem 
+                                               onClick={() => openSwapDialog(
+                                                 taskAssignment.id, 
+                                                 taskAssignment.memberId, 
+                                                 taskAssignment.memberName, 
+                                                 assignment.date
+                                               )}
+                                               className={taskAssignment.id && taskAssignment.id !== '' ? "text-primary cursor-pointer" : "text-muted-foreground"}
+                                               disabled={!taskAssignment.id || taskAssignment.id === ''}
+                                             >
+                                               <ArrowRightLeft className="h-4 w-4 mr-2" />
+                                               {taskAssignment.id && taskAssignment.id !== '' ? "Request Swap" : "Save First"}
+                                             </DropdownMenuItem>
+                                           )}
+                                         </DropdownMenuContent>
+                                       </DropdownMenu>
+                                     </div>
+                                   </div>
                                 </div>
                               )) : assignment.members.map((memberName, memberIndex) => (
                                 <div key={memberIndex} className="space-y-2">
-                                  {/* First line: Status indicator */}
-                                  <div className="flex items-center justify-between gap-3 p-3 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 bg-secondary/20">
-                                    <div className="flex items-center gap-2">
-                                      <div className="flex items-center gap-1 text-muted-foreground">
-                                        <Square className="h-4 w-4" />
-                                        <span className="text-xs font-medium">Pending</span>
-                                      </div>
-                                    </div>
-                                    <div className="text-muted-foreground text-xs">Save first</div>
-                                  </div>
-                                  {/* Second line: Available actions summary */}
-                                  <div className="flex items-center gap-2 px-3 py-2 bg-secondary/30 rounded-lg text-xs">
-                                    <span className="text-muted-foreground">Available actions:</span>
-                                    <span className="text-muted-foreground font-medium">Save roster first</span>
-                                  </div>
+                                                                     {/* First line: Status indicator */}
+                                   <div className="flex items-center justify-between gap-3 p-3 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 bg-secondary/20">
+                                     <div className="flex items-center gap-2">
+                                       <div className="flex items-center gap-1 text-muted-foreground">
+                                         <Square className="h-4 w-4" />
+                                       </div>
+                                     </div>
+                                     <div className="flex items-center gap-2">
+                                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                         <span>Available actions for {memberName}:</span>
+                                         <span className="text-muted-foreground font-medium">Save roster first</span>
+                                       </div>
+                                     </div>
+                                   </div>
                                 </div>
                               ))}
                             </div>
