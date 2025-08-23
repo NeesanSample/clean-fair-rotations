@@ -842,19 +842,85 @@ export const RosterScheduler = () => {
       
       <div className="relative z-10 container mx-auto px-6 py-12 space-y-12">
         {/* Header */}
-        <div className="text-center space-y-6 animate-fade-in">
-          <div className="inline-flex items-center justify-center p-4 glass rounded-3xl hover:shadow-glow transition-all duration-500">
-            <Users className="h-12 w-12 text-primary animate-bounce-subtle" />
+                 <div className="text-center space-y-6 animate-fade-in">
+           <div className="inline-flex items-center justify-center p-4 glass rounded-3xl hover:shadow-glow transition-all duration-500">
+             <Users className="h-12 w-12 text-primary animate-bounce-subtle" />
+           </div>
+           <div className="space-y-4">
+             <h1 className="text-6xl font-bold bg-gradient-primary bg-clip-text text-transparent leading-tight">
+             House Cleaning Roster
+           </h1>
+             <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
+               Create fair and balanced cleaning schedules for your household members with intelligent distribution
+           </p>
+           </div>
+         </div>
+
+                   {/* How to Use Guide */}
+          <div className="glass p-6 rounded-2xl border-2 border-border/20 animate-fade-in">
+            <div className="text-center space-y-4">
+              <h2 className="text-2xl font-bold text-foreground">How to Use This App</h2>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 max-w-6xl mx-auto">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-center w-12 h-12 bg-primary/10 rounded-xl mx-auto">
+                    <Users className="h-6 w-6 text-primary" />
+                  </div>
+                  <h3 className="font-semibold text-foreground">1. Add Team Members</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Enter the names of everyone who will participate in the cleaning schedule
+                  </p>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-center w-12 h-12 bg-accent/10 rounded-xl mx-auto">
+                    <CalendarDays className="h-6 w-6 text-accent" />
+                  </div>
+                  <h3 className="font-semibold text-foreground">2. Select Date Range</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Choose the start and end dates for your cleaning schedule
+                  </p>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-center w-12 h-12 bg-success/10 rounded-xl mx-auto">
+                    <Sparkles className="h-6 w-6 text-success" />
+                  </div>
+                  <h3 className="font-semibold text-foreground">3. Generate & Save</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Click "Generate Schedule" to create a fair rotation, then save it for later use
+                  </p>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-center w-12 h-12 bg-warning/10 rounded-xl mx-auto">
+                    <RefreshCw className="h-6 w-6 text-warning" />
+                  </div>
+                  <h3 className="font-semibold text-foreground">4. Load & Manage</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Load saved schedules and use the Actions column to mark tasks complete or swap assignments
+                  </p>
+                </div>
+              </div>
+              <div className="mt-6 space-y-4">
+                <div className="p-4 bg-primary/5 rounded-xl border border-primary/20">
+                  <p className="text-sm text-muted-foreground">
+                    <strong>Tip:</strong> The app automatically assigns 2 people per week and ensures no one works consecutive weeks for fair distribution.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="p-4 bg-accent/5 rounded-xl border border-accent/20">
+                    <h4 className="font-semibold text-foreground mb-2">Loading Saved Schedules</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Click "Load" next to any saved roster in the "Saved Rosters" section to restore your previous schedule with all assignments and completion status.
+                    </p>
+                  </div>
+                  <div className="p-4 bg-success/5 rounded-xl border border-success/20">
+                    <h4 className="font-semibold text-foreground mb-2">Managing Tasks</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Use the three-dot menu in the Actions column to mark tasks complete, reopen completed tasks, or request swaps with other members on different dates.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="space-y-4">
-            <h1 className="text-6xl font-bold bg-gradient-primary bg-clip-text text-transparent leading-tight">
-            House Cleaning Roster
-          </h1>
-            <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
-              Create fair and balanced cleaning schedules for your household members with intelligent distribution
-          </p>
-          </div>
-        </div>
 
         <div className="grid gap-10 lg:grid-cols-2">
           {/* Setup Section */}
