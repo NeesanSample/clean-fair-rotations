@@ -932,28 +932,31 @@ export const RosterScheduler = () => {
         // Table header
         const thead = document.createElement('thead');
         const headerRow = document.createElement('tr');
-        headerRow.style.backgroundColor = '#f0f0f0';
+        headerRow.style.backgroundColor = '#e3f2fd'; // Light blue background for header row
         
         const dateHeader = document.createElement('th');
         dateHeader.textContent = 'Date';
         dateHeader.style.padding = '12px';
-        dateHeader.style.border = '1px solid #ddd';
+        dateHeader.style.border = '1px solid #2196f3'; // Blue border for header
         dateHeader.style.textAlign = 'left';
         dateHeader.style.fontWeight = 'bold';
+        dateHeader.style.color = '#1565c0'; // Darker blue text for contrast
         
         const membersHeader = document.createElement('th');
         membersHeader.textContent = 'Assigned Members';
         membersHeader.style.padding = '12px';
-        membersHeader.style.border = '1px solid #ddd';
+        membersHeader.style.border = '1px solid #2196f3'; // Blue border for header
         membersHeader.style.textAlign = 'left';
         membersHeader.style.fontWeight = 'bold';
+        membersHeader.style.color = '#1565c0'; // Darker blue text for contrast
         
         const statusHeader = document.createElement('th');
         statusHeader.textContent = 'Status';
         statusHeader.style.padding = '12px';
-        statusHeader.style.border = '1px solid #ddd';
+        statusHeader.style.border = '1px solid #2196f3'; // Blue border for header
         statusHeader.style.textAlign = 'left';
         statusHeader.style.fontWeight = 'bold';
+        statusHeader.style.color = '#1565c0'; // Darker blue text for contrast
 
         headerRow.appendChild(dateHeader);
         headerRow.appendChild(membersHeader);
@@ -961,10 +964,18 @@ export const RosterScheduler = () => {
         thead.appendChild(headerRow);
         table.appendChild(thead);
 
-        // Table body
-        const tbody = document.createElement('tbody');
-        assignments.forEach((assignment) => {
-          const row = document.createElement('tr');
+                 // Table body
+         const tbody = document.createElement('tbody');
+         assignments.forEach((assignment, index) => {
+           const row = document.createElement('tr');
+           
+           // Add attractive alternating row colors for better readability
+           const isEvenRow = index % 2 === 0;
+           if (isEvenRow) {
+             row.style.backgroundColor = '#f0f8ff'; // Light blue tint
+           } else {
+             row.style.backgroundColor = '#fafafa'; // Light gray
+           }
           
           const dateCell = document.createElement('td');
           dateCell.textContent = format(new Date(assignment.date), "EEEE, MMMM do, yyyy");
@@ -1133,29 +1144,48 @@ export const RosterScheduler = () => {
         pdf.text('Weekly Schedule', margin, yPosition);
         yPosition += 10;
 
-        // Table headers
+        // Table headers with background color
         pdf.setFontSize(10);
         pdf.setFont('helvetica', 'bold');
         const colWidths = [50, 80, 30];
         const colX = [margin, margin + 50, margin + 130];
         
+        // Add header background color
+        pdf.setFillColor(227, 242, 253); // Light blue background for headers
+        pdf.rect(margin, yPosition - 8, pageWidth - (2 * margin), 10, 'F');
+        
+        // Add header text with darker color
+        pdf.setTextColor(21, 101, 192); // Darker blue text for headers
         pdf.text('Date', colX[0], yPosition);
         pdf.text('Members', colX[1], yPosition);
         pdf.text('Status', colX[2], yPosition);
         yPosition += 8;
 
+        // Reset text color for content
+        pdf.setTextColor(0, 0, 0); // Black text for content
+        
         // Draw header line
         pdf.line(margin, yPosition, pageWidth - margin, yPosition);
         yPosition += 5;
 
         // Table content
         pdf.setFont('helvetica', 'normal');
-        assignments.forEach((assignment) => {
+        assignments.forEach((assignment, index) => {
           // Check if we need a new page
           if (yPosition > 270) {
             pdf.addPage();
             yPosition = 20;
           }
+
+                     // Add attractive alternating row background colors for better readability
+           const isEvenRow = index % 2 === 0;
+           if (isEvenRow) {
+             pdf.setFillColor(240, 248, 255); // Light blue tint for even rows
+             pdf.rect(margin, yPosition - 2, pageWidth - (2 * margin), 8, 'F');
+           } else {
+             pdf.setFillColor(250, 250, 250); // Light gray for odd rows
+             pdf.rect(margin, yPosition - 2, pageWidth - (2 * margin), 8, 'F');
+           }
 
           const dateText = format(new Date(assignment.date), "MMM do");
           let membersText = '';
@@ -1687,17 +1717,20 @@ export const RosterScheduler = () => {
               <div className="mobile-table-container rounded-2xl border-2 border-border/30">
                 <Table className="w-full mobile-table">
                                      <TableHeader>
-                     <TableRow className="bg-gradient-secondary border-b-2 border-border/30 hover:bg-gradient-secondary">
-                       <TableHead className="font-bold text-foreground text-base sm:text-lg p-3 sm:p-6">Date</TableHead>
-                       <TableHead className="font-bold text-foreground text-base sm:text-lg p-3 sm:p-6">Members</TableHead>
-                       <TableHead className="font-bold text-foreground text-base sm:text-lg p-3 sm:p-6">Actions</TableHead>
+                     <TableRow className="bg-blue-50 border-b-2 border-blue-200 hover:bg-blue-100">
+                       <TableHead className="font-bold text-blue-800 text-base sm:text-lg p-3 sm:p-6">Date</TableHead>
+                       <TableHead className="font-bold text-blue-800 text-base sm:text-lg p-3 sm:p-6">Members</TableHead>
+                       <TableHead className="font-bold text-blue-800 text-base sm:text-lg p-3 sm:p-6">Actions</TableHead>
                      </TableRow>
                    </TableHeader>
                   <TableBody>
                     {assignments.map((assignment, index) => (
                                              <TableRow 
                          key={index} 
-                         className="border-b border-border/20 hover:bg-secondary/30 transition-all duration-300"
+                         className={cn(
+                           "border-b border-border/20 hover:bg-secondary/30 transition-all duration-300",
+                           index % 2 === 0 ? "bg-blue-50/50" : "bg-gray-50/50"
+                         )}
                          style={{ animationDelay: `${index * 100}ms` }}
                        >
                          <TableCell className="p-3 sm:p-6 font-semibold text-sm sm:text-lg">
