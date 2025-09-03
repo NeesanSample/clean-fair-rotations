@@ -1,0 +1,46 @@
+name: Supabase Keep-Alive
+
+on:
+  schedule:
+    # Run every 6 hours to keep database active
+    - cron: '0 */6 * * *'
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+    name: Ping Supabase Database
+    
+    steps:
+      - name: Ping Supabase Keep-Alive Function
+        run: |
+          echo "Pinging Supabase keep-alive function..."
+          
+          # Replace with your actual Supabase project URL
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            "https://ktqrukvljxsebcrqvbdp.supabase.co/functions/v1/keep-alive")
+          
+          # Extract response body and status code
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          RESPONSE_BODY=$(echo "$RESPONSE" | head -n -1)
+          
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response: $RESPONSE_BODY"
+          
+          # Check if the request was successful
+          if [ "$HTTP_CODE" -eq 200 ]; then
+            echo "✅ Keep-alive successful"
+          else
+            echo "❌ Keep-alive failed with status $HTTP_CODE"
+            exit 1
+          fi
+          
+      - name: Log Success
+        if: success()
+        run: |
+          echo "✅ Supabase database keep-alive completed successfully at $(date)"
+          
+      - name: Log Failure
+        if: failure()
+        run: |
+          echo "❌ Supabase database keep-alive failed at $(date)"

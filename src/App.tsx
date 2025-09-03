@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
+import { useKeepAlive } from "./hooks/use-keep-alive";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -14,11 +15,18 @@ const queryClient = new QueryClient({
   },
 });
 
+// Keep-alive component to prevent Supabase from sleeping
+const KeepAliveWrapper = () => {
+  useKeepAlive({ intervalMinutes: 60 }); // Ping every hour
+  return null;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
+      <KeepAliveWrapper />
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
