@@ -1336,36 +1336,70 @@ export const RosterScheduler = () => {
             </div>
           </div>
 
-        <div className="grid gap-10 lg:grid-cols-2">
-          {/* Setup Section */}
-          <div className="space-y-8 animate-slide-up">
+        <div className="space-y-8">
+          {/* Saved Rosters Section */}
+          <Card className="card-modern hover:shadow-glow transition-all duration-500">
+            <CardHeader className="pb-6">
+              <CardTitle className="flex items-center gap-4 text-2xl">
+                <div className="p-3 bg-gradient-secondary rounded-2xl">
+                  <Users className="h-6 w-6 text-primary" />
+                </div>
+                Saved Rosters
+                <Button variant="outline" size="sm" className="ml-auto rounded-xl" onClick={loadRosters} disabled={isLoadingRosters}>
+                  {isLoadingRosters ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                </Button>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {rosters.length === 0 ? (
+                <div className="text-sm text-muted-foreground">No saved rosters yet.</div>
+              ) : (
+                <div className="space-y-2">
+                  {rosters.map((r: any) => (
+                    <div key={r.id} className="flex items-center gap-3 p-3 rounded-xl ring-1 ring-border hover:bg-secondary/30 transition-all">
+                      <div className="font-semibold truncate">{r.name}</div>
+                      <div className="text-xs text-muted-foreground ml-auto">{format(new Date(r.start_date), 'MMM d, yyyy')} - {format(new Date(r.end_date), 'MMM d, yyyy')}</div>
+                      <Button size="sm" className="rounded-xl" variant="secondary" onClick={() => handleSelectRoster(r.id)}>Load</Button>
+                      <Button size="sm" className="rounded-xl" variant="destructive" onClick={() => handleDeleteRoster(r.id)}>
+                        <Trash className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Setup Roster and Date Range Section - Combined */}
+          <div className="grid gap-8 lg:grid-cols-2">
+            {/* Setup Roster Section */}
             <Card className="card-modern hover:shadow-glow transition-all duration-500">
               <CardHeader className="pb-6">
                 <CardTitle className="flex items-center gap-4 text-2xl">
                   <div className="p-3 bg-gradient-primary rounded-2xl">
                     <CalendarDays className="h-6 w-6 text-primary-foreground" />
                   </div>
-                Setup Roster
-              </CardTitle>
+                  Setup Roster
+                </CardTitle>
                 <CardDescription className="text-lg text-muted-foreground">
-                Configure your cleaning schedule parameters
-              </CardDescription>
-            </CardHeader>
+                  Configure your cleaning schedule parameters
+                </CardDescription>
+              </CardHeader>
               <CardContent className="space-y-8">
-              {/* Roster Name */}
+                {/* Roster Name */}
                 <div className="space-y-3">
                   <Label htmlFor="roster-name" className="text-sm font-semibold">Roster Name</Label>
-                <Input
-                  id="roster-name"
-                  placeholder="e.g., January Cleaning Schedule"
-                  value={rosterName}
-                  onChange={(e) => setRosterName(e.target.value)}
+                  <Input
+                    id="roster-name"
+                    placeholder="e.g., January Cleaning Schedule"
+                    value={rosterName}
+                    onChange={(e) => setRosterName(e.target.value)}
                     className="h-12 border-2 border-border/50 focus:border-primary focus:ring-primary/20 rounded-xl transition-all duration-300"
-                />
-              </div>
+                  />
+                </div>
 
                 {/* Team Members */}
-              <div className="space-y-4">
+                <div className="space-y-4">
                   <Label className="text-sm font-semibold">Team Members</Label>
                   <div className="flex gap-3">
                     <Input
@@ -1454,42 +1488,7 @@ export const RosterScheduler = () => {
               </CardContent>
             </Card>
 
-            {/* Saved Rosters Management */}
-            <Card className="card-modern hover:shadow-glow transition-all duration-500">
-              <CardHeader className="pb-6">
-                <CardTitle className="flex items-center gap-4 text-2xl">
-                  <div className="p-3 bg-gradient-secondary rounded-2xl">
-                    <Users className="h-6 w-6 text-primary" />
-                  </div>
-                  Saved Rosters
-                  <Button variant="outline" size="sm" className="ml-auto rounded-xl" onClick={loadRosters} disabled={isLoadingRosters}>
-                    {isLoadingRosters ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                  </Button>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {rosters.length === 0 ? (
-                  <div className="text-sm text-muted-foreground">No saved rosters yet.</div>
-                ) : (
-                  <div className="space-y-2">
-                    {rosters.map((r: any) => (
-                      <div key={r.id} className="flex items-center gap-3 p-3 rounded-xl ring-1 ring-border hover:bg-secondary/30 transition-all">
-                        <div className="font-semibold truncate">{r.name}</div>
-                        <div className="text-xs text-muted-foreground ml-auto">{format(new Date(r.start_date), 'MMM d, yyyy')} - {format(new Date(r.end_date), 'MMM d, yyyy')}</div>
-                        <Button size="sm" className="rounded-xl" variant="secondary" onClick={() => handleSelectRoster(r.id)}>Load</Button>
-                        <Button size="sm" className="rounded-xl" variant="destructive" onClick={() => handleDeleteRoster(r.id)}>
-                          <Trash className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Schedule Configuration */}
-          <div className="space-y-8 animate-slide-up [animation-delay:200ms]">
+            {/* Date Range Section */}
             <Card className="card-modern hover:shadow-glow transition-all duration-500">
               <CardHeader className="pb-6">
                 <CardTitle className="flex items-center gap-4 text-2xl">
@@ -1566,8 +1565,8 @@ export const RosterScheduler = () => {
                         />
                       </PopoverContent>
                     </Popover>
+                  </div>
                 </div>
-              </div>
 
                 {/* Date Analysis */}
                 {startDate && endDate && members.length >= 2 && (
@@ -1580,8 +1579,8 @@ export const RosterScheduler = () => {
                       <div className="flex items-center justify-between">
                         <span className="text-muted-foreground">Minimum needed:</span>
                         <span className="font-bold text-accent text-xl">{weeksNeeded}</span>
-                </div>
-                
+                      </div>
+                      
                       {selectedWeeks < weeksNeeded && (
                         <div className="p-4 bg-warning/10 border-2 border-warning/20 rounded-xl">
                           <div className="flex items-center gap-3">
@@ -1590,8 +1589,8 @@ export const RosterScheduler = () => {
                               Consider selecting at least {weeksNeeded} weeks for optimal distribution
                             </span>
                           </div>
-                  </div>
-                )}
+                        </div>
+                      )}
                       
                       {selectedWeeks >= weeksNeeded && (
                         <div className="p-4 bg-success/10 border-2 border-success/20 rounded-xl">
@@ -1599,40 +1598,40 @@ export const RosterScheduler = () => {
                             <CheckCircle className="h-5 w-5 text-success shrink-0" />
                             <span className="text-success font-medium">
                               Perfect! Your schedule allows for fair distribution
-                        </span>
-                      </div>
+                            </span>
+                          </div>
                         </div>
                       )}
                     </div>
                   </div>
-              )}
+                )}
 
                 {/* Action Buttons */}
                 <div className="space-y-4">
-                <Button 
-                  onClick={generateSchedule} 
+                  <Button 
+                    onClick={generateSchedule} 
                     disabled={members.length < 2 || !startDate || !endDate}
                     size="lg"
                     className="w-full btn-gradient h-14 rounded-xl font-bold text-lg transform active:scale-95"
-                >
+                  >
                     <Sparkles className="h-5 w-5 mr-3" />
-                  Generate Schedule
-                </Button>
+                    Generate Schedule
+                  </Button>
 
-                {assignments.length > 0 && (
-                  <Button 
-                    onClick={saveRoster} 
+                  {assignments.length > 0 && (
+                    <Button 
+                      onClick={saveRoster} 
                       disabled={isLoading || !rosterName.trim()}
                       size="lg"
                       variant="outline"
                       className="w-full h-12 rounded-xl font-semibold border-2 border-primary/30 hover:bg-primary hover:text-primary-foreground"
-                  >
-                    {isLoading ? "Saving..." : "Save Roster"}
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                    >
+                      {isLoading ? "Saving..." : "Save Roster"}
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
 
