@@ -1,10 +1,10 @@
 name: Supabase Keep-Alive
 
 on:
-  schedule:
-    # Run every 6 hours to keep the database alive
-    - cron: '0 */6 * * *'
-  workflow_dispatch:  # Allow manual trigger
+  # schedule:
+  #   # Run every 6 hours to keep the database alive
+  #   - cron: '0 */6 * * *'
+  workflow_dispatch:  # Allow manual trigger only
 
 jobs:
   keep-alive:
