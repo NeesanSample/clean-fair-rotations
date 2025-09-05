@@ -436,16 +436,67 @@ export const RosterScheduler = () => {
         .update({ start_date: startStr, end_date: endStr })
         .eq('id', rosterId);
       if (updateError) throw updateError;
-      const { error: delAssign } = await supabase
+      
+      // For updates, we don't delete existing assignments to preserve swap data
+      // Instead, we'll update the existing assignments
+      const { data: existingAssignments, error: fetchAssignmentsError } = await supabase
         .from('cleaning_assignments')
-        .delete()
+        .select('*')
         .eq('roster_id', rosterId);
-      if (delAssign) throw delAssign;
-      const { error: delMembers } = await supabase
+      if (fetchAssignmentsError) throw fetchAssignmentsError;
+      
+      // Update existing assignments with current state
+      if (existingAssignments && existingAssignments.length > 0) {
+        for (const existingAssignment of existingAssignments) {
+          const currentAssignment = currentAssignments
+            .find(a => a.date === existingAssignment.assignment_date)
+            ?.assignments?.find(ta => ta.id === existingAssignment.id);
+          
+          if (currentAssignment) {
+            const { error: updateAssignmentError } = await supabase
+              .from('cleaning_assignments')
+              .update({
+                is_completed: currentAssignment.isCompleted || false,
+                completed_at: currentAssignment.completedAt || null,
+                completed_by: currentAssignment.completedBy || null,
+                swapped_with: currentAssignment.swappedWith || null,
+                swap_requested_at: currentAssignment.swapRequestedAt || null,
+                swap_requested_by: currentAssignment.swapRequestedBy || null,
+                swap_status: currentAssignment.swapStatus || null
+              })
+              .eq('id', existingAssignment.id);
+            if (updateAssignmentError) throw updateAssignmentError;
+          }
+        }
+      }
+      
+      // Update members if needed
+      const { data: existingMembers, error: fetchMembersError } = await supabase
         .from('roster_members')
-        .delete()
+        .select('*')
         .eq('roster_id', rosterId);
-      if (delMembers) throw delMembers;
+      if (fetchMembersError) throw fetchMembersError;
+      
+      // Check if members have changed
+      const existingMemberNames = (existingMembers || []).map(m => m.name).sort();
+      const currentMemberNames = currentMembers.map(m => m.name).sort();
+      const membersChanged = JSON.stringify(existingMemberNames) !== JSON.stringify(currentMemberNames);
+      
+      if (membersChanged) {
+        const { error: delAssign } = await supabase
+          .from('cleaning_assignments')
+          .delete()
+          .eq('roster_id', rosterId);
+        if (delAssign) throw delAssign;
+        const { error: delMembers } = await supabase
+          .from('roster_members')
+          .delete()
+          .eq('roster_id', rosterId);
+        if (delMembers) throw delMembers;
+      } else {
+        // Members haven't changed, so we can return early
+        return { rosterId, isUpdate };
+      }
     } else {
       const { data: inserted, error: insertError } = await supabase
         .from('rosters')
@@ -555,7 +606,19 @@ export const RosterScheduler = () => {
       
       if (error) throw error;
       
-      // Refresh assignments to show updated status
+      // Update local state immediately for better UX
+      setAssignments(prevAssignments => 
+        prevAssignments.map(assignment => ({
+          ...assignment,
+          assignments: assignment.assignments?.map(task => 
+            task.id === assignmentId 
+              ? { ...task, isCompleted: true, completedAt: new Date().toISOString(), completedBy: memberId }
+              : task
+          )
+        }))
+      );
+      
+      // Also refresh from database to ensure consistency
       if (selectedRosterId) {
         await handleSelectRoster(selectedRosterId);
       }
@@ -587,7 +650,19 @@ export const RosterScheduler = () => {
       
       if (error) throw error;
       
-      // Refresh assignments to show updated status
+      // Update local state immediately for better UX
+      setAssignments(prevAssignments => 
+        prevAssignments.map(assignment => ({
+          ...assignment,
+          assignments: assignment.assignments?.map(task => 
+            task.id === assignmentId 
+              ? { ...task, isCompleted: false, completedAt: null, completedBy: null }
+              : task
+          )
+        }))
+      );
+      
+      // Also refresh from database to ensure consistency
       if (selectedRosterId) {
         await handleSelectRoster(selectedRosterId);
       }
@@ -620,7 +695,25 @@ export const RosterScheduler = () => {
       
       if (error) throw error;
       
-      // Refresh assignments to show updated status
+      // Update local state immediately for better UX
+      setAssignments(prevAssignments => 
+        prevAssignments.map(assignment => ({
+          ...assignment,
+          assignments: assignment.assignments?.map(task => 
+            task.id === assignmentId 
+              ? { 
+                  ...task, 
+                  swapRequestedAt: new Date().toISOString(), 
+                  swapRequestedBy: requestingMemberId, 
+                  swappedWith: targetMemberId, 
+                  swapStatus: 'pending' as const 
+                }
+              : task
+          )
+        }))
+      );
+      
+      // Also refresh from database to ensure consistency
       if (selectedRosterId) {
         await handleSelectRoster(selectedRosterId);
       }
@@ -650,6 +743,18 @@ export const RosterScheduler = () => {
       
       if (error) throw error;
       
+      // Update local state immediately for better UX
+      setAssignments(prevAssignments => 
+        prevAssignments.map(assignment => ({
+          ...assignment,
+          assignments: assignment.assignments?.map(task => 
+            task.id === assignmentId 
+              ? { ...task, swapStatus: response }
+              : task
+          )
+        }))
+      );
+      
       // If accepted, swap the assignments
       if (response === 'accepted') {
         // This would require additional logic to actually swap the assignments
@@ -665,7 +770,7 @@ export const RosterScheduler = () => {
         });
       }
       
-      // Refresh assignments to show updated status
+      // Also refresh from database to ensure consistency
       if (selectedRosterId) {
         await handleSelectRoster(selectedRosterId);
       }
@@ -737,13 +842,18 @@ export const RosterScheduler = () => {
         return;
       }
 
-      // Update both assignments to swap them
+      // Get the member IDs for both assignments
+      const sourceMemberId = selectedAssignmentForSwap.memberId;
+      const targetMemberId = targetAssignment.memberId;
+
+      // Perform the actual swap by updating the member_id for both assignments
       const swapTimestamp = new Date().toISOString();
+      
+      // Update the source assignment to have the target member
       const { error: error1 } = await supabase
         .from('cleaning_assignments')
         .update({
-          member_id: targetAssignment.memberId,
-          assignment_date: selectedAssignmentForSwap.date,
+          member_id: targetMemberId,
           swapped_with: targetAssignment.id,
           swap_status: 'accepted',
           swap_requested_at: swapTimestamp
@@ -752,11 +862,11 @@ export const RosterScheduler = () => {
 
       if (error1) throw error1;
 
+      // Update the target assignment to have the source member
       const { error: error2 } = await supabase
         .from('cleaning_assignments')
         .update({
-          member_id: selectedAssignmentForSwap.memberId,
-          assignment_date: swapTargetDate,
+          member_id: sourceMemberId,
           swapped_with: selectedAssignmentForSwap.assignmentId,
           swap_status: 'accepted',
           swap_requested_at: swapTimestamp
@@ -765,73 +875,73 @@ export const RosterScheduler = () => {
 
       if (error2) throw error2;
 
-             // Refresh assignments to show updated status
-       if (selectedRosterId) {
-         await handleSelectRoster(selectedRosterId);
-         // Also refresh the rosters list to ensure consistency
-         await loadRosters();
-       } else {
-         // If no roster is selected, we need to refresh the assignments from the database
-         // This handles the case where assignments were swapped but not saved yet
-         try {
-           const { data: dbAssignments, error: assignError } = await supabase
-             .from('cleaning_assignments')
-             .select('*')
-             .order('assignment_date', { ascending: true });
-           
-           if (!assignError && dbAssignments) {
-             // Group assignments by date with detailed information
-             const grouped: Record<string, any[]> = {};
-             dbAssignments.forEach((a: any) => {
-               const key = a.assignment_date;
-               if (!grouped[key]) grouped[key] = [];
-               const mem = members.find((m: any) => m.id === a.member_id);
-               if (mem) {
-                 grouped[key].push({
-                   id: a.id,
-                   memberId: a.member_id,
-                   memberName: mem.name,
-                   isCompleted: a.is_completed,
-                   completedAt: a.completed_at,
-                   completedBy: a.completed_by,
-                   swappedWith: a.swapped_with,
-                   swapRequestedAt: a.swap_requested_at,
-                   swapRequestedBy: a.swap_requested_by,
-                   swapStatus: a.swap_status
-                 });
-               }
-             });
-             
-             const builtAssignments = Object.keys(grouped).sort().map(date => ({ 
-               date, 
-               members: grouped[date].map(a => a.memberName),
-               assignments: grouped[date]
-             }));
-             setAssignments(builtAssignments);
-           }
-         } catch (refreshError) {
-           console.error('Error refreshing assignments after swap:', refreshError);
-         }
-       }
+      // Refresh assignments to show updated status
+      if (selectedRosterId) {
+        await handleSelectRoster(selectedRosterId);
+        // Also refresh the rosters list to ensure consistency
+        await loadRosters();
+      } else {
+        // If no roster is selected, we need to refresh the assignments from the database
+        // This handles the case where assignments were swapped but not saved yet
+        try {
+          const { data: dbAssignments, error: assignError } = await supabase
+            .from('cleaning_assignments')
+            .select('*')
+            .order('assignment_date', { ascending: true });
+          
+          if (!assignError && dbAssignments) {
+            // Group assignments by date with detailed information
+            const grouped: Record<string, any[]> = {};
+            dbAssignments.forEach((a: any) => {
+              const key = a.assignment_date;
+              if (!grouped[key]) grouped[key] = [];
+              const mem = members.find((m: any) => m.id === a.member_id);
+              if (mem) {
+                grouped[key].push({
+                  id: a.id,
+                  memberId: a.member_id,
+                  memberName: mem.name,
+                  isCompleted: a.is_completed,
+                  completedAt: a.completed_at,
+                  completedBy: a.completed_by,
+                  swappedWith: a.swapped_with,
+                  swapRequestedAt: a.swap_requested_at,
+                  swapRequestedBy: a.swap_requested_by,
+                  swapStatus: a.swap_status
+                });
+              }
+            });
+            
+            const builtAssignments = Object.keys(grouped).sort().map(date => ({ 
+              date, 
+              members: grouped[date].map(a => a.memberName),
+              assignments: grouped[date]
+            }));
+            setAssignments(builtAssignments);
+          }
+        } catch (refreshError) {
+          console.error('Error refreshing assignments after swap:', refreshError);
+        }
+      }
 
-       setSwapDialogOpen(false);
-       setSelectedAssignmentForSwap(null);
-       setSwapTargetDate("");
-       setSwapTargetMember("");
+      setSwapDialogOpen(false);
+      setSelectedAssignmentForSwap(null);
+      setSwapTargetDate("");
+      setSwapTargetMember("");
 
-       toast({
-         title: "Swap Completed! 🔄",
-         description: `${selectedAssignmentForSwap.memberName} and ${swapTargetMember} have swapped tasks`,
-       });
+      toast({
+        title: "Swap Completed! 🔄",
+        description: `${selectedAssignmentForSwap.memberName} and ${swapTargetMember} have swapped tasks`,
+      });
     } catch (error) {
       console.error('Error executing swap:', error);
-              toast({
-          title: "Error",
-          description: "Failed to execute task swap",
-          variant: "destructive"
-        });
-      }
-    };
+      toast({
+        title: "Error",
+        description: "Failed to execute task swap",
+        variant: "destructive"
+      });
+    }
+  };
 
     // Export functions
     const exportAsImage = async () => {
@@ -1746,7 +1856,7 @@ export const RosterScheduler = () => {
                                       {/* First line: Member name and avatar with completion status */}
                                       <div className={cn(
                                         "flex items-center justify-between gap-3 p-3 rounded-xl shadow-sm hover:shadow-md transition-all duration-300",
-                                        taskAssignment.isCompleted ? "" : "opacity-60"
+                                        taskAssignment.isCompleted ? "ring-2 ring-success/50" : "opacity-60"
                                       )} style={{ backgroundColor: memberNameToColor[taskAssignment.memberName] || 'hsl(var(--primary))' }}>
                                         <div className="flex items-center gap-3">
                                           <Avatar className="h-8 w-8 ring-2 ring-white/30" style={{ boxShadow: `0 0 0 2px ${memberNameToColor[taskAssignment.memberName]}33` }}>
@@ -1776,20 +1886,6 @@ export const RosterScheduler = () => {
                                          </div>
                                        )}
                                       
-                                      {/* Third line: Swap indicator if task was swapped */}
-                                      {wasSwapped && (
-                                        <div className="flex items-center gap-2 px-3 py-2 bg-primary/10 rounded-lg text-xs border border-primary/20">
-                                          <ArrowRightLeft className="h-3 w-3 text-primary" />
-                                          <span className="text-primary font-medium">
-                                            Task swapped from another date
-                                          </span>
-                                          {taskAssignment.swapRequestedAt && (
-                                            <span className="text-muted-foreground">
-                                              • {format(new Date(taskAssignment.swapRequestedAt), "MMM d")}
-                                            </span>
-                                          )}
-                                        </div>
-                                      )}
                                     </div>
                                   );
                                 }) : assignment.members.map((memberName, memberIndex) => (
@@ -1823,11 +1919,15 @@ export const RosterScheduler = () => {
                               {assignment.assignments ? assignment.assignments.map((taskAssignment, memberIndex) => (
                                 <div key={memberIndex} className="space-y-2">
                                                                      {/* First line: Status indicator and action button */}
-                                   <div className="flex items-center justify-between gap-3 p-3 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 bg-secondary/20">
+                                   <div className={cn(
+                                     "flex items-center justify-between gap-3 p-3 rounded-xl shadow-sm hover:shadow-md transition-all duration-300",
+                                     taskAssignment.isCompleted ? "bg-success/10 border border-success/20" : "bg-secondary/20"
+                                   )}>
                                      <div className="flex items-center gap-2">
                                        {taskAssignment.isCompleted ? (
                                          <div className="flex items-center gap-1 text-success">
                                            <CheckSquare className="h-5 w-5" />
+                                           <span className="text-xs font-medium">Completed</span>
                                          </div>
                                        ) : taskAssignment.swapStatus === 'pending' ? (
                                          <div className="flex items-center gap-1 text-warning">
@@ -1837,21 +1937,14 @@ export const RosterScheduler = () => {
                                        ) : (
                                          <div className="flex items-center gap-1 text-muted-foreground">
                                            <Square className="h-4 w-4" />
+                                           <span className="text-xs font-medium">Pending</span>
                                          </div>
                                        )}
                                      </div>
                                                                            <div className="flex items-center gap-2">
                                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                          {taskAssignment.isCompleted ? (
-                                            <span className="text-success font-medium">Completed</span>
-                                          ) : (
-                                            <>
-                                              <span>Available actions for {taskAssignment.memberName}:</span>
-                                              <span className="text-success font-medium">Complete Task</span>
-                                              {taskAssignment.swapStatus !== 'pending' && (
-                                                <span className="text-primary font-medium">• Request Swap</span>
-                                              )}
-                                            </>
+                                          {!taskAssignment.isCompleted && taskAssignment.swapStatus !== 'pending' && (
+                                            <span>Available actions for {taskAssignment.memberName}</span>
                                           )}
                                         </div>
                                        <DropdownMenu>
